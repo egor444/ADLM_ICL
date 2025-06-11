@@ -5,6 +5,7 @@
 *.png
 *.pth
 *.joblib
+*.pyc
 
-data/
+
 im_context/

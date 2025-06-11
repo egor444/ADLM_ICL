@@ -1,0 +1,10 @@
+*.txt
+*.csv
+*.err
+*.out
+*.png
+*.pth
+*.joblib
+
+data/
+im_context/

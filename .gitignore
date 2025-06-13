@@ -6,6 +6,6 @@
 *.pth
 *.joblib
 *.pyc
-
+*.log
 
 im_context/

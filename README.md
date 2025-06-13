@@ -9,8 +9,5 @@ Establish in-context learning as a viable methodology for forking with mdeical i
 - **data:** raw and preprocessed data files, more info in the ```data/README.md```
 - **data_analysis:** notebooks for looking into and analysing data and plotting simple plots
 - **data_extraction:** combination, creation and processing of data to use as input
-- **simple_test:** first simple MLP test and a tabpfn test *TODO: redo this and other folders to a general structure*
-
-**Other files:**
-- **NOTES.md:** notes on what to do and meeting notes (deprecated-ish)
-- 
+- **classification:** model training an testing for classifications tasks
+- **regression:** model training an testing for regression tasks

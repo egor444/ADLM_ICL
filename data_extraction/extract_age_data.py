@@ -292,7 +292,7 @@ def perform_pca(data_path_train, data_path_val, output_path, ignore_cols=None, n
     pca_data_val = pd.DataFrame(pca_data_val, columns=[f'PC{i+1}' for i in range(pca.n_components_)])
     if ignore_cols is not None:
         pca_data_val[ignore_cols] = target_data
-    pca_data_val.to_csv(output_path + "pca_val.csv", index=False)
+    pca_data_val.to_csv(output_path + "pca_test.csv", index=False)
     print(f"\tPCA applied, total features: {pca_data_val.shape[1]-len(ignore_cols)}")
 
 if __name__ == "__main__":

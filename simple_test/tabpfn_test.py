@@ -9,6 +9,7 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import auc, roc_auc_score, accuracy_score, roc_curve
+
 import time
 
 
@@ -84,9 +85,8 @@ def plot_predictions(y_test, y_pred, mse, mae, r2, test_name):
 
 def run_regression():
     print("Running TabPFN")
-    data_path = "../data/regression/train_fat_pca.csv"
-    test_path_wat = "../data/regression/test_fat_pca.csv"
-    test_path_fat = "../data/regression/test_fat_pca.csv"
+    data_path = "../data/regression/ALL_pca_train.csv"
+    test_path = "../data/regression/ALL_pca_test.csv"
     USE_PCA = False
     model = TabPFNRegressor(device='cuda', ignore_pretraining_limits=True)
     
@@ -97,21 +97,16 @@ def run_regression():
     print(f"\tModel fitted in {train_time:.2f} seconds.")
 
     test_time_1 = time.time()
-    ypred, ytest, mse, mae, r2 = test_model(model, test_path_wat, use_pca=pca)
+    ypred, ytest, mse, mae, r2 = test_model(model, test_path, use_pca=pca)
     test_time_1 = time.time() - test_time_1
-    print(f"\tModel tested on wat data in {test_time_1:.2f} seconds.")
-    plot_predictions(ytest, ypred, mse, mae, r2, "fat_regression")
-    test_time_2 = time.time()
-    ypred, ytest, mse, mae, r2 = test_model(model, test_path_fat, use_pca = pca)
-    test_time_2 = time.time() - test_time_2
-    print(f"\tModel tested on fat data in {test_time_2:.2f} seconds.")
-    plot_predictions(ytest, ypred, mse, mae, r2, "wat_regression")
+    print(f"\tModel tested on ALL data in {test_time_1:.2f} seconds.")
+    plot_predictions(ytest, ypred, mse, mae, r2, "ALL_regression")
     print("TabPFN regression test finished.")
 
 
 def run_test_classification():
     print("Running TabPFN classification test; loading data..")
-    data_path_train = "../data/classification/train_fat_pca.csv"
+    data_path_train = "../data/classification/ALL_pca_train.csv"
     data_train = pd.read_csv(data_path_train)
 
     # balance classes 
@@ -134,7 +129,7 @@ def run_test_classification():
     train_time = time.time() - train_time
     print(f"\tModel fitted in {train_time:.2f} seconds.")
     print("\tModel fitting complete. Testing model..")
-    data_path_test = "../data/classification/test_fat_pca.csv"
+    data_path_test = "../data/classification/ALL_pca_test.csv"
     data_test = pd.read_csv(data_path_test)
 
     
@@ -151,7 +146,7 @@ def run_test_classification():
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
     disp.plot(cmap=plt.cm.Blues)
     plt.title(f'TabPFN Classification Confusion Matrix\nAccuracy: {acc:.2f}')
-    plt.savefig('outputs/tabpfn_classification_cm.png')
+    plt.savefig('outputs/tabpfn_classification_ALL_cm.png')
     plt.show()
 
     y_prob = model.predict_proba(X_test)[:, 1]
@@ -169,7 +164,7 @@ def run_test_classification():
     plt.ylabel('True Positive Rate')
     plt.title('ROC Curve for TabPFN')
     plt.legend(loc='lower right')
-    plt.savefig('outputs/tabpfn_classification_roc.png')
+    plt.savefig('outputs/tabpfn_classification_ALL_roc.png')
     plt.show()
     print(f"TabPFN classification test finished. Accuracy: {acc:.2f}, ROC AUC: {roc_auc:.2f}")
 

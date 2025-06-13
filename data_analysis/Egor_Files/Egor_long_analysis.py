@@ -56,6 +56,7 @@ def run_data_analysis():
         print("Model fitted")
         # Make predictions
         y_pred_lr = model.predict(X_test_scaled)
+        
         print("Predictions made")
         # Evaluate the model
         lr_mae = mean_absolute_error(y_test, y_pred_lr)

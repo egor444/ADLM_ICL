@@ -16,5 +16,5 @@ Data as inputs for the risk assessment binary calssification task
 - radiomics_embeddings_fat_top500:  top 500 correlating features to age from rad & emb + age
 - radiomics_embeddings_fat/wat:     all radiomics + embeddings + age
 - radiomics_fat/wat:                just radiomics and eids collected (incomplete)
-- radiomics_fat/wat_v2:             just radiomics and eids collected (ongoing, more complete)
+- radiomics_fat/wat_v2:             just radiomics and eids collected (incomplete, more stuff)
 - tte_embeddings:                   embeddings and time to event data for tte < 5 years

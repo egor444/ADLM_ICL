@@ -7,5 +7,6 @@
 *.joblib
 *.pyc
 *.log
+*.json
 
 im_context/

@@ -9,20 +9,26 @@ from sklearn.decomposition import PCA
 import logging
 import multiprocessing as mp
 import sys
+from data_manager import DataManager
+
+def convert_time_to_string(seconds):
+    minutes, sec = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{int(hours)}h {int(minutes)}m {int(sec)}s"
 
 #### Radiomics extraction, required for other functions ###
-def extract_radiomics_data(eid_type="healthy", eid_paths=None):
+def extract_radiomics_data(eid_type="healthy", eid_paths=None, logger=None, data_path='/vol/miltank/projects/practical_sose25/in_context_learning/data/'):
     ''' Extract all radiomics data from the subfolders into a singler file for each type (wat and fat)'''
-    logger = logging.getLogger("RADIOMICS")
+    if logger is None:
+        logger = logging.getLogger("RADIOMICS")
     logger.info("Running radiomics data extraction")
-    paths = pd.read_csv('../paths.csv', index_col=0)
-    radiomics_path = paths.loc["radiomics"].iloc[0]
+    radiomics_path = '/vol/miltank/projects/ukbb/data/whole_body/radiomics/'
 
     if eid_paths is None or len(eid_paths) == 0:
         logger.error("Radiomics data paths not provided, cancelling extraction.")
         return
 
-    output_paths = [f"../data/raw/radiomics_{eid_type}_fat.csv", f"../data/raw/radiomics_{eid_type}_wat.csv"]
+    output_paths = [f"{data_path}/raw/radiomics/radiomics_{eid_type}_fat.csv", f"{data_path}/raw/radiomics/radiomics_{eid_type}_wat.csv"]
     for output_path in output_paths:
         if os.path.exists(output_path):
             logger.info(f"Radiomics for {eid_type} data already extracted. Skipping extraction.")
@@ -48,19 +54,13 @@ def extract_radiomics_data(eid_type="healthy", eid_paths=None):
             logger.info(f"\tTime taken for first 10 iterations: {(time_end - time_start):.2f} seconds")
             time_approx = ((time_end - time_start) * len(eids) / 10) * 3  # estimate time for all iterations, assuming 3x the time of first 10 iterations
             # time_approx = len(eids) * 100 # estimate time for all iterations, assuming 100 seconds per iteration
-            time_name = "seconds"
-            if time_approx > 60:
-                time_approx = time_approx / 60
-                time_name = "minutes"
-            elif time_approx > 3600:
-                time_approx = time_approx / 3600
-                time_name = "hours"
-            logger.info(f"\tTime approximation for all iterations: {time_approx:.2f} {time_name}")
+            time_name = convert_time_to_string(time_approx)
+            logger.info(f"\tTime approximation for all iterations: {time_name}")
         if (time.time() - time_start) > (60 * 5 * save_iterations):  # save every 5 minutes
-            logger.info(f"\tExtracted {i} / {len(eids)}, time taken: {(time.time() - time_start):.2f} seconds.\n\tSaving progress...")
+            logger.info(f"\tExtracted {i} / {len(eids)}, time taken: {convert_time_to_string(time.time() - time_start)}. Saving progress...")
             radiomics_wat.to_csv(output_paths[1], index=False)
             radiomics_fat.to_csv(output_paths[0], index=False)
-            logger.info(f"Save {save_iterations}. Dataframe size: {radiomics_wat.memory_usage(deep=True).sum() / 1e9:.2f} GB")
+            logger.info(f"\t\tSave {save_iterations}. Dataframe size: {radiomics_wat.memory_usage(deep=True).sum() / 1e9:.2f} GB")
             save_iterations += 1
         radiomics_wat_temp = pd.read_csv(radiomics_path + eids[i] + "/radiomics_features_wat.csv")
         radiomics_fat_temp = pd.read_csv(radiomics_path + eids[i] + "/radiomics_features_fat.csv")
@@ -192,8 +192,8 @@ def merge_radiomics_and_embeddings_reg(separate_types=False):
                 logger.info(f"Saved radiomics {rad_type} data with age {set_type} data; size: {mae_age_data.shape}")
     else:
         logger.info(f"Loading radiomics data")
-        radiomics_fat = pd.read_csv(f"{radiomics_path_partial}_fat.csv")
-        radiomics_wat = pd.read_csv(f"{radiomics_path_partial}_wat.csv")
+        radiomics_fat = pd.read_csv(f"{radiomics_path_partial}fat.csv")
+        radiomics_wat = pd.read_csv(f"{radiomics_path_partial}wat.csv")
         # add type to columns
         radiomics_fat.rename(columns=lambda x: f"{x}_fat" if x not in ["eid", "age"] else x, inplace=True)
         radiomics_wat.rename(columns=lambda x: f"{x}_wat" if x not in ["eid", "age"] else x, inplace=True)
@@ -410,6 +410,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Extract or change data")
 
     parser.add_argument("--separate_types", action="store_true", help="Separate radiomics data by type (fat and wat) for regression and classification")
+    parser.add_argument("--run_radiomics_all", action="store_true", help="Run radiomics data extraction for all disease types and fat and wat")
 
     # arguments for regression data extraction
     parser.add_argument("--run_reg", action="store_true", help="Run regression data extraction")
@@ -426,6 +427,9 @@ if __name__ == "__main__":
     parser.add_argument("--combine_rad_emb_healthy_and_disease", action="store_true", help="Combine healthy and disease data for classification")
     parser.add_argument("--create_class", action="store_true", help="Create classification data files from combined data")
     parser.add_argument("--pca_class", action="store_true", help="Perform PCA on classification data")
+    
+    parser.add_argument("--test_data_mgr", action="store_true", help="Run the data manager test")
+    
     args = parser.parse_args()
 
     # Logging setup
@@ -443,6 +447,23 @@ if __name__ == "__main__":
     radiomics_type = "fat" if args.separate_types else "ALL"
     regression_path = f"../data/regression/{radiomics_type}"
     classification_path = f"../data/classification/{disease_type}/{radiomics_type}_"
+
+    if args.run_radiomics_all:
+        logging.info("Running radiomics data extraction for all disease types")
+        extract_radiomics_data(eid_type="healthy", eid_paths=["../data/raw/healthy_train.csv", "../data/raw/healthy_test.csv"])
+        for disease, path in DISEASE_TO_PATH.items():
+            if disease == "cancer3" or disease == "cancer4":
+                continue
+            logging.info(f"Extracting radiomics data for {disease} from {path}")
+            extract_radiomics_data(eid_type=disease, eid_paths=[path])
+        
+
+    if args.test_data_mgr:
+        d_logger = logging.getLogger("D MANAGER TEST")
+        d_logger.info("Running data manager test")
+        dm = DataManager("regression", "emb","rboth", logger=d_logger)
+        d_logger.info("Data manager test completed successfully")
+        sys.exit(0)
 
     if args.run_reg:
         args.emb_age_reg = True

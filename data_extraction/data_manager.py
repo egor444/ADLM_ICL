@@ -58,6 +58,7 @@ class DataManager:
 
     - nosave: do not save the data (default: False)
     - force: force recombining of data even if it already exists in the data folder (default: False)
+    - verbose: print output of the data manager (default: False)
 
     - pca: apply PCA transformation to the data (default: False)
 
@@ -85,6 +86,7 @@ class DataManager:
         if self.task == 'regression' and self.disease is not None:
             self.log("WARNING: Disease specified for regression task, setting to classification.", level=logging.WARNING)
             self.task = 'classification'
+        self.verbose = True if 'verbose' in flags else False
         # Data folder paths
         self.data_folder_path = kvargs.get('data_folder_path', PATH_DICT['data_default'])
         self.interim = self.data_folder_path + '/interim/'
@@ -339,6 +341,8 @@ class DataManager:
         
 
     def log(self, message, level=logging.INFO):
+        if not self.verbose:
+            return
         if self.logger:
             self.logger.log(level, message)
         else:

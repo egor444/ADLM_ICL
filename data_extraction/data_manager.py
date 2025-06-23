@@ -1,14 +1,12 @@
 
 import pandas as pd
 import os
-import time
-import argparse
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 import logging
-import multiprocessing as mp
-import sys
+from sklearn.preprocessing import StandardScaler
+from PIL import Image
 
 
 ################################################################################
@@ -20,10 +18,11 @@ import sys
 
 
 PATH_DICT = {
-    'embeddings': pd.read_csv('../paths.csv', index_col=0).loc["embeddings"].iloc[0],
-    'healthy_train': pd.read_csv('../paths.csv', index_col=0).loc["healthy_train"].iloc[0],
-    'healthy_test': pd.read_csv('../paths.csv', index_col=0).loc["healthy_val"].iloc[0],
-    'data_default': '/vol/miltank/projects/practical_sose25/in_context_learning/data'
+    'embeddings': '/vol/miltank/projects/ukbb/data/whole_body/mae_embeddings/embeddings_cls.csv',
+    'healthy_train': '/vol/miltank/projects/ukbb/projects/practical_ss25_icl/whole_body_3d_healthy_noselfreported_noicd10_assessment2_train_df.csv',
+    'healthy_test': '/vol/miltank/projects/ukbb/projects/practical_ss25_icl/whole_body_3d_healthy_noselfreported_noicd10_assessment2_val_df.csv',
+    'data_default': '/vol/miltank/projects/practical_sose25/in_context_learning/data',
+    'img_folder': '/vol/miltank/projects/ukbb/data/whole_body/nifti_2d'
 }
 
 DISEASE_TO_PATH = {
@@ -36,8 +35,9 @@ DISEASE_TO_PATH = {
 }
 
 RAD_TYPES = ['rnone','rfat','rwat','rboth']
-ALL_FLAGS = ['classification', 'regression', 'emb', 'img', 'force', 'nosave'] + list(DISEASE_TO_PATH.keys()) + RAD_TYPES
+ALL_FLAGS = ['classification', 'regression', 'emb', 'img', 'force', 'nosave', 'pca'] + list(DISEASE_TO_PATH.keys()) + RAD_TYPES
 FILE_FLAGS = ['emb', 'img', 'rfat','rwat','rboth']
+UNCHANGED_COLS = ['eid', 'target', 'age', 'img']  # Columns that should not be changed during processing
 
 class DataManager:
     '''
@@ -58,6 +58,8 @@ class DataManager:
 
     - nosave: do not save the data (default: False)
     - force: force recombining of data even if it already exists in the data folder (default: False)
+
+    - pca: apply PCA transformation to the data (default: False)
 
     Possible arguments:
     - data_folder_path: path to the data folder
@@ -126,22 +128,26 @@ class DataManager:
         if os.path.exists(self.outfile_paths[0]) and os.path.exists(self.outfile_paths[1]) and not 'force' in flags:
             self.log(f"Data already exists. Loading data.", level=logging.INFO)
             self.data = [pd.read_csv(self.outfile_paths[0]), pd.read_csv(self.outfile_paths[1])]
+            if 'pca' in flags:
+                self.apply_pca(n_components=kvargs.get('n_components', 0.95))
             return
         self.data = []
         self.init_eids(split=kvargs.get('split', 0.2))
         self.create_data()
+        if 'pca' in flags:
+            self.apply_pca(n_components=kvargs.get('n_components', 0.95))
 
     def get_train(self):
         ''' Get the training data '''
         if not self.data:
             raise ValueError("Data not initialized.")
-        return self.data[0]
+        return self.data[0].drop(columns=['eid'])
 
     def get_test(self):
         ''' Get the test data '''
         if not self.data:
             raise ValueError("Data not initialized.")
-        return self.data[1]
+        return self.data[1].drop(columns=['eid'])
 
     def load_from_path(self, path):
         ''' Load a dataframe from the specified path'''
@@ -189,7 +195,24 @@ class DataManager:
         new_test = pd.merge(self.data[1], new_data, on='eid', how='left')
         self.data = [new_train, new_test]
         self.log(f"Data combined. New shapes: train {self.data[0].shape}, test {self.data[1].shape}", level=logging.INFO)
-    
+
+    def load_images(self, eids, path = PATH_DICT['img_folder']):
+        ''' Load 2d images from the specified path '''
+        images = []
+        out_eids = [eid for eid in eids if os.path.exists(os.path.join(path, f"{eid}.png"))]
+        if len(eids) - len(out_eids) > 0:
+            self.log(f"WARNING: {len(eids) - len(out_eids)} eids do not have corresponding images.", level=logging.WARNING)
+        for eid in out_eids:
+            img_path = os.path.join(path, f"{eid}.png")
+            img = Image.open(img_path).getdata()
+            # convert to list
+            img = list(img)
+            images.append(img)
+
+        # image dataframe with one column 'img'
+        img_frame = pd.DataFrame({'img': images, 'eid': out_eids})
+        return img_frame
+
     def create_data(self):
         ''' Create the final data by combining all data sources '''
         if not self.data:
@@ -201,10 +224,11 @@ class DataManager:
             emb_data = emb_data[emb_cols]
             self.combine_data(emb_data)
         if self.img:
-            self.log("Images are not yet implemented.", level=logging.ERROR)
-            pass
+            self.log("Loading images.", level=logging.INFO)
+            all_eids = self.data[0]['eid'].tolist() + self.data[1]['eid'].tolist()
+            images = self.load_images(all_eids)
+            self.combine_data(images)
         if self.rad_type != 'rnone':
-            
             # Fat Radiomics
             if self.rad_type == 'rfat' or self.rad_type == 'rboth':
                 self.log("Loading radiomics features for fat.", level=logging.INFO)
@@ -242,18 +266,77 @@ class DataManager:
                     combined_rad_data = pd.merge(rfat_data, rwat_data, on='eid', how='left')
                     combined_all = pd.concat([combined_rad_healthy, combined_rad_data], ignore_index=True)
                     self.combine_data(combined_all)
-        # clean data, drop columns with more than 30% nan values
+        # clean data
+        # drop columns with non numeric values
+        drops_cols = [col for col in self.data[0].columns if col not in UNCHANGED_COLS]
+        exclude_cols = self.data[0][drops_cols].select_dtypes(exclude=[np.float64, np.int64, np.number]).columns.tolist()
+        self.data[0] = self.data[0].drop(columns=exclude_cols)
+        self.data[1] = self.data[1].drop(columns=exclude_cols)
+        # drop columns with more than 30% nan values, except 'eid', 'target', 'age', 'img'
         nanprc = 0.3
-        self.data[0] = self.data[0].dropna(thresh=int((1-nanprc) * self.data[0].shape[0]), axis=1)
-        self.data[1] = self.data[1].dropna(thresh=int((1-nanprc) * self.data[1].shape[0]), axis=1)
-        self.data[0] = self.data[0].dropna(axis=0, how='all')
-        self.data[1] = self.data[1].dropna(axis=0, how='all')
-        # save data if save_data is True
+        drops_cols = [col for col in self.data[0].columns if col not in UNCHANGED_COLS]
+        keep_cols = list(self.data[0][drops_cols].dropna(thresh=int((1 - nanprc) * self.data[0].shape[0]), axis=1).columns)
+        keep_cols = [col for col in self.data[0] if col in UNCHANGED_COLS] + keep_cols
+        self.data[0] = self.data[0][keep_cols]
+        self.data[1] = self.data[1][keep_cols]
+        # drop rows with nan values
+        self.data[0] = self.data[0].dropna()
+        self.data[1] = self.data[1].dropna()
+        # normalize data
+        scaler = StandardScaler()
+        cols_to_normalize = [col for col in self.data[0].columns if col not in UNCHANGED_COLS]
+        if len(cols_to_normalize) == 0:
+            self.log("No columns to normalize. Skipping.", level=logging.INFO)
+        else:
+            self.log(f"Normalizing columns: {len(cols_to_normalize)}", level=logging.INFO)
+            self.data[0][cols_to_normalize] = scaler.fit_transform(self.data[0][cols_to_normalize])
+            self.data[1][cols_to_normalize] = scaler.transform(self.data[1][cols_to_normalize])
+        # drop age column if classification task
+        if (self.task == 'classification') and ('age' in self.data[0].columns):
+            self.data[0] = self.data[0].drop(columns=['age'])
+            self.data[1] = self.data[1].drop(columns=['age'])
+        # save data if no nosave flag is set
         if self.save_data:
             self.log(f"Saving data to {self.outfile_paths[0]} and {self.outfile_paths[1]}", level=logging.INFO)
             self.data[0].to_csv(self.outfile_paths[0], index=False)
             self.data[1].to_csv(self.outfile_paths[1], index=False)
         self.log(f"Data created with shapes: train {self.data[0].shape}, test {self.data[1].shape}", level=logging.INFO)
+    
+    def img_to_np(self):
+        ''' Convert image column to numpy arrays '''
+        if not self.data:
+            raise ValueError("Data not initialized. Call init_eids() first.")
+        if 'img' not in self.data[0].columns or 'img' not in self.data[1].columns:
+            raise ValueError("Image column 'img' not found in data.")
+        self.log("Converting image column to numpy arrays.", level=logging.INFO)
+        self.data[0]['img'] = self.data[0]['img'].apply(lambda x: np.array(eval(x)))
+        self.data[1]['img'] = self.data[1]['img'].apply(lambda x: np.array(eval(x)))
+
+    def apply_pca(self, n_components=0.95, to_img=False):
+        ''' Apply PCA transformation to the data '''
+        if not self.data:
+            raise ValueError("Data not initialized. Call init_eids() first.")
+        self.log(f"Applying PCA transformation with {n_components} components.", level=logging.INFO)
+        pca = PCA(n_components=n_components)
+        # Fit PCA on training data
+        pca_cols = [col for col in self.data[0].columns if col not in UNCHANGED_COLS]
+        meta_cols = [col for col in self.data[0].columns if col in UNCHANGED_COLS]
+        if len(pca_cols) == 0 and not to_img:
+            self.log("No columns to apply PCA on. Skipping.", level=logging.INFO)
+            return
+        if len(pca_cols) > 0:
+            train_frame = pd.DataFrame(pca.fit_transform(self.data[0][pca_cols]))
+            test_frame = pd.DataFrame(pca.transform(self.data[1][pca_cols]))
+            self.data[0] = pd.concat([self.data[0][meta_cols], train_frame], axis=1)
+            self.data[1] = pd.concat([self.data[1][meta_cols], test_frame], axis=1)
+            self.log(f"PCA applied. Number of components: {train_frame.shape[1]}", level=logging.INFO)
+        if to_img:
+            if 'img' not in self.data[0].columns or 'img' not in self.data[1].columns:
+                raise ValueError("Image column 'img' not found in data.")
+            self.data[0]['img'] = list(pca.transform(np.stack(self.data[0]['img'].values)))
+            self.data[1]['img'] = list(pca.transform(np.stack(self.data[1]['img'].values)))
+            self.log(f"PCA applied to images. Number of components: {len(self.data[0]['img'].iloc[0])}", level=logging.INFO)
+        
 
     def log(self, message, level=logging.INFO):
         if self.logger:

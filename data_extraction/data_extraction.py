@@ -433,7 +433,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Logging setup
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)10s - %(message)s', filename='logs/data_extraction.log', filemode='w')
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)8s - %(name)10s - %(message)s', filename='logs/data_extraction.log', filemode='w')
 
     logging.info("###### STARTING DATA EXTRACTION #######")
     total_operations = sum([arg for arg in vars(args).values() if isinstance(arg, bool) and arg])
@@ -461,7 +461,10 @@ if __name__ == "__main__":
     if args.test_data_mgr:
         d_logger = logging.getLogger("D MANAGER TEST")
         d_logger.info("Running data manager test")
-        dm = DataManager("regression", "emb","rboth", logger=d_logger)
+        dm = DataManager("classification", "liver", "emb", "rboth", "pca", logger=d_logger)
+        train_data = dm.get_train()
+        d_logger.info(f"Train data shape: {train_data.shape}")
+        d_logger.info(train_data.head(3))
         d_logger.info("Data manager test completed successfully")
         sys.exit(0)
 

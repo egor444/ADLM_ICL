@@ -7,6 +7,7 @@ from sklearn.decomposition import PCA
 import logging
 from sklearn.preprocessing import StandardScaler
 from PIL import Image
+from torch.utils.data import Dataset, DataLoader
 
 
 ################################################################################
@@ -35,7 +36,7 @@ DISEASE_TO_PATH = {
 }
 
 RAD_TYPES = ['rnone','rfat','rwat','rboth']
-ALL_FLAGS = ['classification', 'regression', 'emb', 'img', 'force', 'nosave', 'pca'] + list(DISEASE_TO_PATH.keys()) + RAD_TYPES
+ALL_FLAGS = ['classification', 'regression', 'emb', 'img', 'force', 'nosave', 'pca', 'verbose'] + list(DISEASE_TO_PATH.keys()) + RAD_TYPES
 FILE_FLAGS = ['emb', 'img', 'rfat','rwat','rboth']
 UNCHANGED_COLS = ['eid', 'target', 'age', 'img']  # Columns that should not be changed during processing
 
@@ -66,6 +67,7 @@ class DataManager:
     - data_folder_path: path to the data folder
     - split: fraction of data to be used for testing (default: 0.2)
     - logger: a logger object to log messages (default: None, prints to console)
+    - k_folds: number of folds for k-fold cross-validation (default: 5)
 
     Example usage:
     dm = DataManager('classification', 'cancer', 'emb', 'rboth', logger=my_logger)
@@ -87,6 +89,7 @@ class DataManager:
             self.log("WARNING: Disease specified for regression task, setting to classification.", level=logging.WARNING)
             self.task = 'classification'
         self.verbose = True if 'verbose' in flags else False
+        self.folds = kvargs.get('k_folds', 5)  # Number of folds for k-fold cross-validation
         # Data folder paths
         self.data_folder_path = kvargs.get('data_folder_path', PATH_DICT['data_default'])
         self.interim = self.data_folder_path + '/interim/'
@@ -123,21 +126,22 @@ class DataManager:
             self.out_path + flagstring + 'train.csv',
             self.out_path + flagstring + 'test.csv'
         ]
+        self.fold_ids_path = self.out_path + flagstring + 'fold_ids.txt'
         # check if output paths exist
         if not os.path.exists(self.out_path):
             os.makedirs(self.out_path)
-        # check if output files already exist
+        # check if output files already exist and load data if not forcing recombination
         if os.path.exists(self.outfile_paths[0]) and os.path.exists(self.outfile_paths[1]) and not 'force' in flags:
             self.log(f"Data already exists. Loading data.", level=logging.INFO)
             self.data = [pd.read_csv(self.outfile_paths[0]), pd.read_csv(self.outfile_paths[1])]
-            if 'pca' in flags:
-                self.apply_pca(n_components=kvargs.get('n_components', 0.95))
-            return
-        self.data = []
-        self.init_eids(split=kvargs.get('split', 0.2))
-        self.create_data()
+        else:
+            self.data = []
+            self.init_eids(split=kvargs.get('split', 0.2))
+            self.create_data()
         if 'pca' in flags:
             self.apply_pca(n_components=kvargs.get('n_components', 0.95))
+        # create folds
+        self.fold_data_indices = self.split_folds()
 
     def get_train(self):
         ''' Get the training data '''
@@ -150,6 +154,30 @@ class DataManager:
         if not self.data:
             raise ValueError("Data not initialized.")
         return self.data[1].drop(columns=['eid'])
+    
+    def get_fold_data_set(self, fold_indices): # input list of fold indices, like [0, 1, 4]
+        ''' Get the data for a specific fold '''
+        if not self.data:
+            raise ValueError("Data not initialized.")
+        if not self.fold_data_indices:
+            raise ValueError("Fold data not initialized.")
+        for i in fold_indices:
+            if i < 0 or i >= len(self.fold_data_indices):
+                raise ValueError(f"Invalid fold index {i}.")
+        outset = self.data[0].iloc[self.fold_data_indices[fold_indices[0]][0]:self.fold_data_indices[fold_indices[-1]][1]+1].reset_index(drop=True)
+        if len(fold_indices) > 1:
+            for i in fold_indices[1:]:
+                fold_data = self.data[0].iloc[self.fold_data_indices[i][0]:self.fold_data_indices[i][1]+1].reset_index(drop=True)
+                outset = pd.concat([outset, fold_data], ignore_index=True)
+        self.log(f"Returning fold data with shape {outset.shape} for folds {fold_indices}.", level=logging.INFO)
+        return outset.drop(columns=['eid'])
+    
+    def get_fold_data_loader(self, fold_indices, **kwargs):
+        ''' Get a DataLoader for a specific fold '''
+        fold_data = self.get_fold_data_set(fold_indices)
+        target_label = 'target' if self.task == 'classification' else 'age'
+        dataset = ICLDataset(fold_data, target_label=target_label)
+        return DataLoader(dataset, **kwargs)
 
     def load_from_path(self, path):
         ''' Load a dataframe from the specified path'''
@@ -304,6 +332,26 @@ class DataManager:
             self.data[1].to_csv(self.outfile_paths[1], index=False)
         self.log(f"Data created with shapes: train {self.data[0].shape}, test {self.data[1].shape}", level=logging.INFO)
     
+    def split_folds(self):
+        ''' Split the data into k folds for cross-validation '''
+        if not self.data:
+            raise ValueError("Data not initialized. Call init_eids() first.")
+        # load if fold_ids_path exists
+        if os.path.exists(self.fold_ids_path) and not 'force' in self.file_flags:
+            self.log(f"Fold IDs already exist at {self.fold_ids_path}. Loading fold IDs.", level=logging.INFO)
+            with open(self.fold_ids_path, 'r') as f:
+                train_indices_start_end = [tuple(map(int, line.strip().split(','))) for line in f.readlines()]
+        # create new fold IDs
+        else:
+            train_indices = np.array_split(np.arange(len(self.data[0])), self.folds)
+            train_indices_start_end = [(ti[0], ti[-1]) for ti in train_indices]
+            # save train_indices_start_end
+            with open(self.fold_ids_path, 'w') as f:
+                for start, end in train_indices_start_end:
+                    f.write(f"{start},{end}\n")
+        return train_indices_start_end
+
+
     def img_to_np(self):
         ''' Convert image column to numpy arrays '''
         if not self.data:
@@ -347,4 +395,20 @@ class DataManager:
             self.logger.log(level, message)
         else:
             print(message)
-        
+
+
+class ICLDataset(Dataset):
+        ''' Custom Dataset class for ICL data '''
+        def __init__(self, data_frame, target_label='target'):
+            self.data_frame = data_frame
+            self.target_label = target_label
+
+        def __len__(self):
+            return len(self.data_frame)
+
+        def __getitem__(self, idx):
+            item = self.data_frame.iloc[idx]
+            # convert to numpy array
+            target = item[self.target_label] if self.target_label in item else None
+            x = item.drop(self.target_label) if self.target_label in item else item
+            return x.to_numpy(), target

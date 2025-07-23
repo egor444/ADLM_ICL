@@ -79,6 +79,7 @@ class DataManager:
     def __init__(self, *flags, **kvargs):
         ###### Initialize data manager with flag types #######
         self.logger = kvargs.get('logger', None)
+        self.verbose = True if 'verbose' in flags else False
         # Base flags
         self.task = 'classification' if 'classification' in flags else 'regression'
         self.save_data = False if 'nosave' in flags else True
@@ -88,7 +89,7 @@ class DataManager:
         if self.task == 'regression' and self.disease is not None:
             self.log("WARNING: Disease specified for regression task, setting to classification.", level=logging.WARNING)
             self.task = 'classification'
-        self.verbose = True if 'verbose' in flags else False
+        
         self.folds = kvargs.get('k_folds', 5)  # Number of folds for k-fold cross-validation
         # Data folder paths
         self.data_folder_path = kvargs.get('data_folder_path', PATH_DICT['data_default'])
@@ -154,6 +155,14 @@ class DataManager:
         if not self.data:
             raise ValueError("Data not initialized.")
         return self.data[1].drop(columns=['eid'])
+
+    def get_test_loader(self, **kwargs):
+        ''' Get a DataLoader for the test data '''
+        if not self.data:
+            raise ValueError("Data not initialized.")
+        target_label = 'target' if self.task == 'classification' else 'age'
+        dataset = ICLDataset(self.data[1], target_label=target_label)
+        return DataLoader(dataset, **kwargs)
     
     def get_fold_data_set(self, fold_indices): # input list of fold indices, like [0, 1, 4]
         ''' Get the data for a specific fold '''
@@ -161,14 +170,15 @@ class DataManager:
             raise ValueError("Data not initialized.")
         if not self.fold_data_indices:
             raise ValueError("Fold data not initialized.")
+        
+        rows = []
         for i in fold_indices:
             if i < 0 or i >= len(self.fold_data_indices):
                 raise ValueError(f"Invalid fold index {i}.")
-        outset = self.data[0].iloc[self.fold_data_indices[fold_indices[0]][0]:self.fold_data_indices[fold_indices[-1]][1]+1].reset_index(drop=True)
-        if len(fold_indices) > 1:
-            for i in fold_indices[1:]:
-                fold_data = self.data[0].iloc[self.fold_data_indices[i][0]:self.fold_data_indices[i][1]+1].reset_index(drop=True)
-                outset = pd.concat([outset, fold_data], ignore_index=True)
+            start, end = self.fold_data_indices[i]
+            rows.extend(range(start, end + 1))
+
+        outset = self.data[0].iloc[rows].reset_index(drop=True)
         self.log(f"Returning fold data with shape {outset.shape} for folds {fold_indices}.", level=logging.INFO)
         return outset.drop(columns=['eid'])
     
@@ -221,8 +231,24 @@ class DataManager:
         if 'eid' not in new_data.columns:
             raise ValueError("The new data must contain 'eid' column.")
         self.log(f"Combining data with shape {new_data.shape} with dataset.", level=logging.INFO)
-        new_train = pd.merge(self.data[0], new_data, on='eid', how='left')
-        new_test = pd.merge(self.data[1], new_data, on='eid', how='left')
+        new_train = pd.merge(self.data[0], new_data, on='eid', how='left', suffixes=('', '_new'))
+        new_test = pd.merge(self.data[1], new_data, on='eid', how='left', suffixes=('', '_new'))
+
+        # remove duplicate columns
+        for col in new_train.columns:
+            if col.endswith('_new'):
+                original_col = col[:-4]
+                if original_col in new_train.columns:
+                    new_train = new_train.drop(columns=[col])
+                if original_col in new_test.columns:
+                    new_test = new_test.drop(columns=[col])
+        # rename new columns to original names
+        for col in new_train.columns:
+            if col.endswith('_new'):
+                original_col = col[:-4]
+                if original_col in new_test.columns:
+                    new_test = new_test.rename(columns={col: original_col})
+                new_train = new_train.rename(columns={col: original_col})
         self.data = [new_train, new_test]
         self.log(f"Data combined. New shapes: train {self.data[0].shape}, test {self.data[1].shape}", level=logging.INFO)
 
@@ -302,6 +328,11 @@ class DataManager:
         exclude_cols = self.data[0][drops_cols].select_dtypes(exclude=[np.float64, np.int64, np.number]).columns.tolist()
         self.data[0] = self.data[0].drop(columns=exclude_cols)
         self.data[1] = self.data[1].drop(columns=exclude_cols)
+        #if col age_x rename to age
+        if 'age_x' in self.data[0].columns:
+            self.data[0] = self.data[0].rename(columns={'age_x': 'age'})
+        if 'age_x' in self.data[1].columns:
+            self.data[1] = self.data[1].rename(columns={'age_x': 'age'})
         # drop columns with more than 30% nan values, except 'eid', 'target', 'age', 'img'
         nanprc = 0.3
         drops_cols = [col for col in self.data[0].columns if col not in UNCHANGED_COLS]

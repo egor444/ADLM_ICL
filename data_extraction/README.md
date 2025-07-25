@@ -16,7 +16,7 @@ The training and testing datasets can now be gotten in the form of a pd.DataFram
 
 ```py
 train_set = datamanager.get_train()
-test_set = datamanager.get_train()
+test_set = datamanager.get_test()
 ``` 
 
 **OR** for five fold cross-validation a subset of the training set can be retreived by passing a list of all the indices of folds, like 
@@ -46,8 +46,8 @@ fold_val_set = datamanger.get_fold_data_set([4])
 - *Radiomic data:* ```rfat```, ```rwat```, ```rboth```
 - *Disease types for classification:* ```cancer```, ```copd```, ```liver```, ```pancreatic```
 - *Apply PCA:* ```pca```
-- *Dont save the data combination in the data folder:* ```nosave```
-- *Dont load the data if it already exists and recombine it from scratch:* ```force```
+- *Don't save the data combination in the data folder:* ```nosave```
+- *Don't load the data if it already exists and recombine it from scratch:* ```force```
 - *Log output:* ```verbose```
 
 ### **DataManager Parameters**

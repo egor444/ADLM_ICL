@@ -5,13 +5,13 @@
 ##SBATCH --partition=universe,asteroids
 ##SBATCH --qos=master-queuesave
 #SBATCH --time=16:00:00
-#SBATCH --gres=gpu:0
-#SBATCH --cpus-per-task=1
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 
 ml python/anaconda3
 #source activate adlm-icl
 
 echo "Running extraction job with ID: $SLURM_JOB_ID"
-python -u extract_age_data.py --run_reg --run_class
+python -u data_extraction.py --test_data_mgr
 echo "Extraction job completed with ID: $SLURM_JOB_ID"

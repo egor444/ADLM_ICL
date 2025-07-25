@@ -1,155 +1,160 @@
-from model.model import SimpleMLP, SimpleMLPDeeper
-from data_handling.dataset import EmbeddingsToAgeDataset, create_datasets, create_three_datasets
-import pandas as pd
 import torch
+import torch.nn as nn
 import torch.optim as optim
+from torchvision import transforms, models
+from torch.utils.data import Dataset, DataLoader
+from PIL import Image
+import pandas as pd
+import os
+# DataManager for loading data
+from data_extraction.data_manager import DataManager
 import matplotlib.pyplot as plt
-import optuna
-from functools import partial
+
+class MRIAgeDataset(Dataset):
+    def __init__(self, dataframe, transform=None):
+        self.dataframe = dataframe
+        self.transform = transform
+
+        self.img_path = "/vol/miltank/projects/ukbb/data/whole_body/nifti_2d/"
+        nifti_eids = [eid for eid in self.dataframe['eid'].unique() if os.path.exists(os.path.join(self.img_path, f"{eid}.png"))]
+        self.dataframe = self.dataframe[self.dataframe['eid'].isin(nifti_eids)]
+        self.dataframe['img_path'] = self.dataframe['eid'].apply(lambda x: os.path.join(self.img_path, f"{x}.png"))
+
+    def __len__(self):
+        return len(self.dataframe)
+
+    def __getitem__(self, idx):
+        img_path = self.dataframe.iloc[idx]['img_path']
+        image = Image.open(img_path).convert('RGB')
+        age = self.dataframe.iloc[idx]['age']
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image, torch.tensor(age, dtype=torch.float32)
 
 
-def train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=10, cuda=False, early_stopping_patience=5, verbose=True):
-    train_losses = []
+
+def train_model(data_mgr):
+    print("starting training")
+    transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406],  # ImageNet means
+                         [0.229, 0.224, 0.225])  # ImageNet stds
+    ])
+    data_manager = data_mgr
+    print("DataManager initialized")    
+    train_frame = data_manager.data[0]
+    train_set = MRIAgeDataset(train_frame, transform=transform)
+    train_loader = DataLoader(train_set, batch_size=32, shuffle=True, num_workers=4)
+    print(f"Train loader loaded, size of dataset: {len(train_set)}")
+    val_frame = data_manager.data[1]
+    val_set = MRIAgeDataset(val_frame, transform=transform)
+    val_loader = DataLoader(val_set, batch_size=32, shuffle=False, num_workers=4)
+    print(f"Validation loader loaded, size of dataset: {len(val_set)}")
+    model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
+    model.fc = nn.Linear(model.fc.in_features, 1)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    print(f"Model initialized and moved to device {device}")
+    criterion = nn.L1Loss()
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+
+    num_epochs = 20
+    model.train()
+    print("Starting training loop")
+    losses = []
     val_losses = []
-    early_stopping_counter = 0
-    early_stopping_min_loss = float('inf')
-    if verbose:
-        print(f"Starting training on {len(train_loader.dataset)} training samples and {len(val_loader.dataset)} validation samples.")
     for epoch in range(num_epochs):
-        model.train()
         running_loss = 0.0
-        for i, (inputs, labels) in enumerate(train_loader):
-            if cuda:
-                inputs = inputs.cuda()
-                labels = labels.cuda()
+        running_val_loss = 0.0
+        for inputs, ages in train_loader:
+            inputs, ages = inputs.to(device), ages.to(device).unsqueeze(1)
+
             optimizer.zero_grad()
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            loss = criterion(outputs, ages)
             loss.backward()
             optimizer.step()
-            running_loss += loss.item()
-        epoch_loss = running_loss / len(train_loader)
-        train_losses.append(epoch_loss)
-        if verbose:
-            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}')
 
-        # Validation
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for i, (inputs, labels) in enumerate(val_loader):
-                if cuda:
-                    inputs = inputs.cuda()
-                    labels = labels.cuda()
+            running_loss += loss.item() * inputs.size(0)
+
+        epoch_loss = running_loss / len(train_loader.dataset)
+        losses.append(epoch_loss)
+        for inputs, ages in val_loader:
+            inputs, ages = inputs.to(device), ages.to(device).unsqueeze(1)
+            with torch.no_grad():
                 outputs = model(inputs)
-                loss = criterion(outputs, labels)
-                val_loss += loss.item()
-        val_loss /= len(val_loader)
+                loss = criterion(outputs, ages)
+                running_val_loss += loss.item() * inputs.size(0)
+        val_loss = running_val_loss / len(val_loader.dataset)
         val_losses.append(val_loss)
-        
-        # early stopping
-        if val_loss < early_stopping_min_loss:
-            early_stopping_min_loss = val_loss
-            early_stopping_counter = 0
-            if verbose:
-                print(f'\tValidation Loss: {val_loss:.4f}')
-        else:
-            early_stopping_counter += 1
-            if verbose:
-                print(f'\tValidation Loss: {val_loss:.4f}, Early stopping Counter: {early_stopping_counter}/{early_stopping_patience}')
-            if early_stopping_counter >= early_stopping_patience:
-                if verbose:
-                    print("Early stopping triggered.")
-                break
-    return train_losses, val_losses
+        print(f"Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss:.4f}, Val Loss: {val_loss:.4f}")
+    print("Training complete")
+    
+    # Save the model
+    model_save_path = "mri_age_model.pth"
+    torch.save(model.state_dict(), model_save_path)
+    print(f"Model saved to {model_save_path}")
+    # plot
+    plt.plot(range(num_epochs), losses, label='Training Loss')
+    plt.plot(range(num_epochs), val_losses, label='Validation Loss')
+    plt.xticks(range(num_epochs))
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss over Epochs')
+    plt.legend()
+    plt.savefig("training_loss_plot.png")
+    plt.close()
+    print("Training loss plot saved as training_loss_plot.png")
 
-def test_model(model, test_loader, criterion, verbose=True):
-    test_losses = []
-    for i, (inputs, labels) in enumerate(test_loader):
-        with torch.no_grad():
+def test_model(data_mgr):
+    # load model
+    print("Starting testing")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = models.resnet50(pretrained=False)
+    model.fc = nn.Linear(model.fc.in_features, 1)
+    model.load_state_dict(torch.load("mri_age_model.pth"))
+    model = model.to(device)
+    model.eval()
+    test_frame = data_mgr.data[1]
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406],  # ImageNet means
+                             [0.229, 0.224, 0.225])  # ImageNet stds
+    ])
+    test_set = MRIAgeDataset(test_frame, transform=transform)
+    test_loader = DataLoader(test_set, batch_size=32, shuffle=False, num_workers=4)
+    print(f"Test loader loaded, size of dataset: {len(test_set)}")
+    criterion = nn.L1Loss()
+    total_loss = 0.0
+    with torch.no_grad():
+        for inputs, ages in test_loader:
+            inputs, ages = inputs.to(device), ages.to(device).unsqueeze(1)
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            test_losses.append(loss.item())
-    avg_test_loss = sum(test_losses) / len(test_losses)
-    if verbose:
-        print(f'Average Test Loss: {avg_test_loss:.4f}')
-    return test_losses
+            loss = criterion(outputs, ages)
+            total_loss += loss.item() * inputs.size(0)
+    average_loss = total_loss / len(test_loader.dataset)
+    print(f"Test Loss: {average_loss:.4f}")
+    # plot 
 
-def run_param_training(trial, datasets):
-    
-    criterion = trial.suggest_categorical('criterion', [torch.nn.L1Loss(), torch.nn.MSELoss()])
-    optimizer = trial.suggest_categorical('optimizer', [optim.Adam, optim.SGD])
-    BATCHSIZE = trial.suggest_int('batch_size', 16, 64, step=16)
-    NUM_EPOCHS = trial.suggest_int('num_epochs', 10, 100, step=10)
-    HIDDEN_DIM = trial.suggest_int('hidden_dim', 256, 2048, step=256)
-    OUTPUT_DIM = 1
-    LR = trial.suggest_float('learning_rate', 1e-5, 1e-2, log=True)
-    
-    verbose = False
-    cuda = torch.cuda.is_available()
-    
-    print(f"Running trial with parameters: BATCHSIZE={BATCHSIZE}, NUM_EPOCHS={NUM_EPOCHS}, HIDDEN_DIM={HIDDEN_DIM}")
-    if verbose:
-        print("Loading data from:", train_path)
-    train_set, val_set, test_set = datasets # 
-
-    train_loader = torch.utils.data.DataLoader(
-        train_set,
-        batch_size=BATCHSIZE,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True,
-        drop_last=True
-    )
-    val_loader = torch.utils.data.DataLoader(
-        val_set,
-        batch_size=BATCHSIZE,
-        shuffle=False,
-        num_workers=4,
-        pin_memory=True,
-        drop_last=True
-    )
-
-    test_loader = torch.utils.data.DataLoader(
-        test_set,
-        batch_size=BATCHSIZE,
-        shuffle=False,
-        num_workers=4,
-        pin_memory=True,
-        drop_last=True
-    )
-
-    INPUT_DIM = train_set.X.shape[1]
-    if verbose:
-        print(f"Data loaded successfully.\n\tInput dimension: {INPUT_DIM}, Hidden dimension: {HIDDEN_DIM}, Output dimension: {OUTPUT_DIM}")
-    
-    model = SimpleMLPDeeper(INPUT_DIM, HIDDEN_DIM, OUTPUT_DIM)
-    optimizer = optimizer(model.parameters(), lr=LR)
-
-    train_losses, val_losses = train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=NUM_EPOCHS, cuda=cuda, verbose=verbose)
-    torch.save(model.state_dict(), 'model/simple_mlp.pth')
-    test_losses = test_model(model, test_loader, criterion)
-    avg_test_loss = sum(test_losses) / len(test_losses)
-
-    if verbose:
-        print(f"Average Test Loss: {avg_test_loss:.4f}")
-    return avg_test_loss
+    plt.plot(range(len(test_loader)), [average_loss] * len(test_loader), label='Test Loss')
+    plt.xlabel('Batch')
+    plt.ylabel('Loss')
+    plt.title(f'Test Loss per Batch, total loss: {average_loss:.4f}')
+    plt.legend()
+    plt.savefig("test_loss_plot.png")
+    plt.close()
+    print("Test loss plot saved as test_loss_plot.png")
 
 
 if __name__ == "__main__":
-    print("Starting training process...")
-    train_path = "../data/radiomics_embeddings_fat.csv" 
-    datasets = create_three_datasets(train_path, val_size=0.3)
-    study = optuna.create_study(direction='minimize')
-    partial_run_param_training = partial(run_param_training, datasets=datasets)
-
-    study.optimize(partial_run_param_training, n_trials=10)
-    print("Best trial:")
-    trial = study.best_trial
-    print(f"  Value: {trial.value}")
-    print("  Params:")
-    for key, value in trial.params.items():
-        print(f"    {key}: {value}")
-    
+    print("STARTING TRAINING")
+    data_mgr = DataManager("regression")
+    print("DataManager initialized")
+    train_model(data_mgr)
+    test_model(data_mgr)
 
     print("FINISHED")

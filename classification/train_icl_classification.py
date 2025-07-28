@@ -53,8 +53,6 @@ def process_single_sample(j, X_test, X_train, y_train, x_inv, y_inv, y_test, nn_
     model.fit(x_context, y_context)
     y_pred = model.predict(x_query)
     y_true = y_test[j]
-    # get prediction probabilities
-    y_pred_prob
 
     return (y_true, y_pred[0])
 

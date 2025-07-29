@@ -17,7 +17,7 @@ from torch.utils.data import Dataset, DataLoader
 # All possible flags and arguments are defined in the class below.
 ################################################################################
 
-
+# global constants for paths because files are on this server only
 PATH_DICT = {
     'embeddings': '/vol/miltank/projects/ukbb/data/whole_body/mae_embeddings/embeddings_cls.csv',
     'healthy_train': '/vol/miltank/projects/ukbb/projects/practical_ss25_icl/whole_body_3d_healthy_noselfreported_noicd10_assessment2_train_df.csv',
@@ -73,13 +73,14 @@ class DataManager:
     dm = DataManager('classification', 'cancer', 'emb', 'rboth', logger=my_logger)
     train_data = dm.get_train()
     test_data = dm.get_test()
-    This will initialize the DataManager for a classification task on cancer with embeddings and both radiomics.
+    # This will initialize the DataManager for a classification task on cancer with embeddings and both radiomics.
     '''
 
     def __init__(self, *flags, **kvargs):
         ###### Initialize data manager with flag types #######
         self.logger = kvargs.get('logger', None)
         self.verbose = True if 'verbose' in flags else False
+        self.do_pca = True if 'pca' in flags else False
         # Base flags
         self.task = 'classification' if 'classification' in flags else 'regression'
         self.save_data = False if 'nosave' in flags else True
@@ -105,7 +106,8 @@ class DataManager:
         self.emb = PATH_DICT['embeddings'] if 'emb' in flags else None
         # images directly
         self.img = True if 'img' in flags else False
-        # Log message
+
+        #### Log message about initialization ##
         params = ''
         if self.emb:
             params += 'embeddings, '
@@ -119,7 +121,8 @@ class DataManager:
         unrecognized_flags = [flag for flag in flags if flag not in ALL_FLAGS]
         if unrecognized_flags:
             self.log(f"Warning: Unrecognized flags {unrecognized_flags} will be ignored.", level=logging.WARNING)
-        # Initialize output paths
+        
+        #### Initialize output paths
         self.file_flags = [flag for flag in FILE_FLAGS if flag in flags]
         flagstring = '_'.join(self.file_flags)
         flagstring = flagstring + "_" if flagstring else ''
@@ -139,8 +142,8 @@ class DataManager:
             self.data = []
             self.init_eids(split=kvargs.get('split', 0.2))
             self.create_data()
-        if 'pca' in flags:
-            self.apply_pca(n_components=kvargs.get('n_components', 0.95))
+        if self.do_pca:
+            self.pca = PCA(n_components=kvargs.get('pca_n_components', 0.95))
         # create folds
         self.fold_data_indices = self.split_folds()
 
@@ -164,8 +167,12 @@ class DataManager:
         dataset = ICLDataset(self.data[1], target_label=target_label)
         return DataLoader(dataset, **kwargs)
     
-    def get_fold_data_set(self, fold_indices): # input list of fold indices, like [0, 1, 4]
-        ''' Get the data for a specific fold '''
+    def get_fold_data_set(self, fold_indices, pca="none"): 
+        '''
+        Get the data for a specific fold(s)
+        param fold_indices: list of fold indices to get data for 
+        param pca: 'fit', 'transform', or 'none' to specify PCA transformation
+        '''
         if not self.data:
             raise ValueError("Data not initialized.")
         if not self.fold_data_indices:
@@ -180,6 +187,21 @@ class DataManager:
 
         outset = self.data[0].iloc[rows].reset_index(drop=True)
         self.log(f"Returning fold data with shape {outset.shape} for folds {fold_indices}.", level=logging.INFO)
+
+        ## Apply pca transformations on outgoing data if pca is specified
+        if self.do_pca and pca == "fit":
+            self.fit_pca(outset)
+            self.transform_pca(outset)
+        elif self.do_pca and pca == "transform":
+            if not self.pca:
+                raise ValueError("PCA not fitted. Call fit_pca() first.")
+            outset = self.transform_pca(outset)
+        elif self.do_pca and pca == "none":
+            if len(fold_indices) == 1: # assuming this is test set
+                outset = self.transform_pca(outset)
+            else: # assuming this is train set
+                self.fit_pca(outset)
+                outset = self.transform_pca(outset)
         return outset.drop(columns=['eid'])
     
     def get_fold_data_loader(self, fold_indices, **kwargs):
@@ -273,17 +295,20 @@ class DataManager:
         ''' Create the final data by combining all data sources '''
         if not self.data:
             raise ValueError("Data not initialized. Call init_eids() first.")
-        if self.emb:
+        ### MAE Embeddings
+        if self.emb: 
             self.log(f"Loading embeddings from {self.emb}", level=logging.INFO)
             emb_data = self.load_from_path(self.emb)
             emb_cols = [f"feature_{i}" for i in range(1025)] + ["eid","age"]
             emb_data = emb_data[emb_cols]
             self.combine_data(emb_data)
+        ### Images (this is sort of deprecated)
         if self.img:
             self.log("Loading images.", level=logging.INFO)
             all_eids = self.data[0]['eid'].tolist() + self.data[1]['eid'].tolist()
             images = self.load_images(all_eids)
             self.combine_data(images)
+        ### Radiomics
         if self.rad_type != 'rnone':
             # Fat Radiomics
             if self.rad_type == 'rfat' or self.rad_type == 'rboth':
@@ -322,7 +347,7 @@ class DataManager:
                     combined_rad_data = pd.merge(rfat_data, rwat_data, on='eid', how='left')
                     combined_all = pd.concat([combined_rad_healthy, combined_rad_data], ignore_index=True)
                     self.combine_data(combined_all)
-        # clean data
+        ### clean data
         # drop columns with non numeric values
         drops_cols = [col for col in self.data[0].columns if col not in UNCHANGED_COLS]
         exclude_cols = self.data[0][drops_cols].select_dtypes(exclude=[np.float64, np.int64, np.number]).columns.tolist()
@@ -382,9 +407,8 @@ class DataManager:
                     f.write(f"{start},{end}\n")
         return train_indices_start_end
 
-
     def img_to_np(self):
-        ''' Convert image column to numpy arrays '''
+        ''' Convert image column to numpy arrays (UNUSED) '''
         if not self.data:
             raise ValueError("Data not initialized. Call init_eids() first.")
         if 'img' not in self.data[0].columns or 'img' not in self.data[1].columns:
@@ -392,9 +416,44 @@ class DataManager:
         self.log("Converting image column to numpy arrays.", level=logging.INFO)
         self.data[0]['img'] = self.data[0]['img'].apply(lambda x: np.array(eval(x)))
         self.data[1]['img'] = self.data[1]['img'].apply(lambda x: np.array(eval(x)))
+    
+    def fit_pca(self, data, n_components=0.95):
+        ''' Fit PCA on the data and save the PCA object '''
+        if not isinstance(data, pd.DataFrame):
+            raise ValueError("Data must be a pandas DataFrame.")
+        self.log(f"Fitting PCA with {n_components} components.", level=logging.INFO)
+        self.pca = PCA(n_components=n_components)
+        pca_cols = [col for col in data.columns if col not in UNCHANGED_COLS]
+        if len(pca_cols) == 0:
+            self.log("No columns to apply PCA on. Skipping.", level=logging.INFO)
+            return None
+        self.pca.fit(data[pca_cols])
+        self.log(f"PCA fitted. Number of components: {self.pca.n_components_}", level=logging.INFO)
+        return self.pca
+
+    def transform_pca(self, data):
+        ''' Transform the data using the fitted PCA object '''
+        if not self.pca:
+            raise ValueError("PCA not fitted. Call fit_pca() first.")
+        if not isinstance(data, pd.DataFrame):
+            raise ValueError("Data must be a pandas DataFrame.")
+        self.log("Transforming data using PCA.", level=logging.INFO)
+        pca_cols = [col for col in data.columns if col not in UNCHANGED_COLS]
+        if len(pca_cols) == 0:
+            self.log("No columns to apply PCA on. Skipping.", level=logging.INFO)
+            return data
+        transformed_data = pd.DataFrame(self.pca.transform(data[pca_cols]))
+        meta_cols = [col for col in data.columns if col in UNCHANGED_COLS]
+        transformed_data = pd.concat([data[meta_cols].reset_index(drop=True), transformed_data], axis=1)
+        self.log(f"Data transformed using PCA. New shape: {transformed_data.shape}", level=logging.INFO)
+        return transformed_data
 
     def apply_pca(self, n_components=0.95, to_img=False):
-        ''' Apply PCA transformation to the data '''
+        '''
+        Apply PCA transformation to all train and test data.
+        !!! Only use if the data is not retrieved by folds !!!
+        (Otherwise the folds will cause data leakage)
+        '''
         if not self.data:
             raise ValueError("Data not initialized. Call init_eids() first.")
         self.log(f"Applying PCA transformation with {n_components} components.", level=logging.INFO)
@@ -420,6 +479,7 @@ class DataManager:
         
 
     def log(self, message, level=logging.INFO):
+        ''' Log a message if verbose is enabled to the logger or print to console '''
         if not self.verbose:
             return
         if self.logger:

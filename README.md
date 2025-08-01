@@ -36,9 +36,14 @@ For disease risk assesement we performed binary classififcation (not at-risk/at-
 ml python/anaconda3
 pip install -r requirements
 ```
-3. Navigate in the folder for the task you wish to run, either **regression** or **classification**
-4. *(Optional)* Change the configuration in the ```config_regression.py``` or ```config_classification.py```
-5. Run the respective .sh file e.g. ```run_regression.sh``` or ```run_classification.sh```
+3. *(Optional)* Change the configuration in the ```regression/config_regression.py``` or ```classification/config_classification.py```
+4. Run the respective .sh file you want e.g. 
+```
+sbatch regression/run_regression.sh
+# OR #
+sbatch classification/run_classification.sh
+```
+5. Any output files wil now be in the **outfile** directory.
 
 ## Further Experiments
 

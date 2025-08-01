@@ -79,7 +79,7 @@ ORGAN_PCA_SETTINGS = {
 # Example: 12 organs * 10 components = 120 total features
 
 # Legacy settings (kept for compatibility but not used)
-N_FEATURES = 500  # Not used with organ PCA
+N_FEATURES = 500  # Not used with organ PCA, old for the unused feature selector
 TASK = "classification"
 
 # ============================================================================
@@ -242,7 +242,7 @@ MODELS_WITHOUT_HYPERPARAMETERS = [
 ]
 
 # ============================================================================
-# ICL SETTINGS - IMPROVED
+# ICL SETTINGS 
 # ============================================================================
 
 GPT2ICL_CONTEXT_MODE = "adaptive_nearest_neighbor"
@@ -284,7 +284,7 @@ OPTUNA_N_TRIALS = 5  #reduced for faster completion
 OPTUNA_N_TRIALS_ICL = 3  # Reduced for ICL models because of computational cost
 OPTUNA_N_TRIALS_RF = 3   # Reduced for Random Forest due to computational cost
 OPTUNA_TIMEOUT = 120  # Reduced timeout for faster completion
-OPTUNA_N_JOBS = 1  # Use single job for nested CV compatibility
+OPTUNA_N_JOBS = 1  #single job for nested CV compatibility
 
 # ============================================================================
 # ENSEMBLE SETTINGS

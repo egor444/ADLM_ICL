@@ -82,13 +82,13 @@ def run_classification_pipeline(X, y, config, output_dir):
     base_models = get_classification_models(config.RANDOM_STATE)
     logger.info(f"Loaded {len(base_models)} models: {list(base_models.keys())}")
     
-    # Debug: Check which models are actually available
+    #Check which models are actually available
     logger.info("Model availability check:")
     for model_name in config.MODELS_TO_TEST:
         if model_name in base_models:
-            logger.info(f"  ✓ {model_name} - Available")
+            logger.info(f"{model_name} - Available")
         else:
-            logger.info(f"  ✗ {model_name} - Not available")
+            logger.info(f"{model_name} - Not available")
     
     logger.info(f"Using nested CV: Outer {config.CV_FOLDS}-fold, Inner {config.INNER_CV_FOLDS}-fold")
     logger.info(f"Hyperparameter optimization: Optuna with {config.OPTUNA_N_TRIALS} trials (ICL: {config.OPTUNA_N_TRIALS_ICL})")
@@ -109,58 +109,56 @@ def run_classification_pipeline(X, y, config, output_dir):
         
         logger.info(f"Train samples: {len(train_idx)}, Test samples: {len(test_idx)}")
         
-        logger.info(f"  Data Distribution Analysis:")
-        logger.info(f"    Train target - Classes: {y_train_outer.value_counts().to_dict()}")
-        logger.info(f"    Test target - Classes: {y_test_outer.value_counts().to_dict()}")
+        logger.info(f"Data Distribution Analysis:")
+        logger.info(f"Train target - Classes: {y_train_outer.value_counts().to_dict()}")
+        logger.info(f"Test target - Classes: {y_test_outer.value_counts().to_dict()}")
         
         train_feature_means = X_train_outer.mean()
         test_feature_means = X_test_outer.mean()
         feature_diff = np.abs(train_feature_means - test_feature_means)
-        logger.info(f"    Feature distribution difference - Mean: {feature_diff.mean():.4f}, Max: {feature_diff.max():.4f}")
+        logger.info(f"Feature distribution difference - Mean: {feature_diff.mean():.4f}, Max: {feature_diff.max():.4f}")
         
         if feature_diff.max() > 1.0:
-            logger.warning(f"    Large feature distribution differences detected - potential data leakage risk")
+            logger.warning(f"Large feature distribution differences detected")
         else:
-            logger.info(f"    Feature distributions are similar between train and test sets")
+            logger.info(f"Feature distributions are similar between train and test sets")
         
-        logger.info("  Starting feature engineering...")
-        logger.info(f"    Input features: {X_train_outer.shape[1]}")
-        logger.info(f"    Training samples: {X_train_outer.shape[0]}")
-        logger.info(f"    Test samples: {X_test_outer.shape[0]}")
-        logger.info(f"    No data leakage: Feature engineering fitted only on training data")
+        logger.info("Starting feature engineering...")
+        logger.info(f"Input features: {X_train_outer.shape[1]}")
+        logger.info(f"Training samples: {X_train_outer.shape[0]}")
+        logger.info(f"Test samples: {X_test_outer.shape[0]}")
         
         fe = FeatureEngineering(**config.FEATURE_ENGINEERING_PARAMS)
         X_train_eng = fe.fit_transform(X_train_outer, y_train_outer)
         X_test_eng = fe.transform(X_test_outer)
         logger.info(f"Feature engineering complete: {X_train_eng.shape[1]} features")
         
-        logger.info(f"  Starting organ PCA feature selection: {X_train_eng.shape[1]} features")
-        logger.info(f"    Components per organ: {config.ORGAN_PCA_SETTINGS['n_components_per_organ']}")
+        logger.info(f"Starting organ PCA feature selection: {X_train_eng.shape[1]} features")
+        logger.info(f"Components per organ: {config.ORGAN_PCA_SETTINGS['n_components_per_organ']}")
         
         organ_pca_selector = OrganPCASelector(**config.ORGAN_PCA_SETTINGS)
-        logger.info(f"    No data leakage: Organ PCA fitted only on training data")
         X_train_sel = organ_pca_selector.fit_transform(X_train_eng, y_train_outer)
         X_test_sel = organ_pca_selector.transform(X_test_eng)
-        logger.info(f"  Organ PCA complete: {X_train_sel.shape[1]} PCA components selected")
-        logger.info(f"    Final training shape: {X_train_sel.shape}")
-        logger.info(f"    Final test shape: {X_test_sel.shape}")
+        logger.info(f"Organ PCA complete: {X_train_sel.shape[1]} PCA components selected")
+        logger.info(f"Final training shape: {X_train_sel.shape}")
+        logger.info(f"Final test shape: {X_test_sel.shape}")
         
-        logger.info(f"    Organ PCA analysis:")
-        logger.info(f"      Original features: {X_train_eng.shape[1]}")
-        logger.info(f"      PCA components: {X_train_sel.shape[1]}")
-        logger.info(f"      Organs found: {len(organ_pca_selector.organ_groups)}")
+        logger.info(f"Organ PCA analysis:")
+        logger.info(f"Original features: {X_train_eng.shape[1]}")
+        logger.info(f"PCA components: {X_train_sel.shape[1]}")
+        logger.info(f"Organs found: {len(organ_pca_selector.organ_groups)}")
         
         organ_summary = organ_pca_selector.get_organ_summary()
         if isinstance(organ_summary, dict):
             for organ, info in organ_summary.items():
-                logger.info(f"      {organ}: {info['n_original_features']} features -> {info['n_components']} PCA components")
+                logger.info(f"{organ}: {info['n_original_features']} features -> {info['n_components']} PCA components")
         
         if X_train_sel.shape[1] < 50:
-            logger.warning(f"      Very few PCA components - may cause underfitting")
+            logger.warning(f"Very few PCA components - may cause underfitting")
         elif X_train_sel.shape[1] > 1000:
-            logger.warning(f"      Many PCA components - may cause overfitting")
+            logger.warning(f"Many PCA components - may cause overfitting")
         else:
-            logger.info(f"      Reasonable number of PCA components")
+            logger.info(f"Reasonable number of PCA components")
         
         inner_cv = StratifiedKFold(n_splits=config.INNER_CV_FOLDS, shuffle=True, random_state=config.RANDOM_STATE)
         
@@ -169,7 +167,7 @@ def run_classification_pipeline(X, y, config, output_dir):
         plot_organ_pca_analysis(organ_pca_selector, f"{output_dir}/analysis")
         
         feature_indices = list(range(X_train_sel.shape[1]))
-        logger.info(f"    Setting feature indices for ICL models: {len(feature_indices)} PCA components")
+        logger.info(f"Setting feature indices for ICL models: {len(feature_indices)} PCA components")
         
         for model_name in ['TabPFNICL', 'GPT2ICL']:
             if model_name in base_models:
@@ -177,15 +175,15 @@ def run_classification_pipeline(X, y, config, output_dir):
                     base_models[model_name].set_feature_indices(feature_indices)
         
         for model_name, base_model in base_models.items():
-            logger.info(f"  Training {model_name} with nested CV")
-            logger.info(f"    Outer fold: {fold}/{config.CV_FOLDS}")
-            logger.info(f"    Training data shape: {X_train_sel.shape}")
-            logger.info(f"    Test data shape: {X_test_sel.shape}")
+            logger.info(f"Training {model_name} with nested CV")
+            logger.info(f"Outer fold: {fold}/{config.CV_FOLDS}")
+            logger.info(f"Training data shape: {X_train_sel.shape}")
+            logger.info(f"Test data shape: {X_test_sel.shape}")
             start_time = time.time()
             
             try:
                 if model_name in ["TabPFNICL", "GPT2ICL"]:
-                    logger.info(f"Special handling for ICL model: {model_name}")
+                    logger.info(f"for ICL model: {model_name}")
                     logger.info(f"Using default parameters (no hyperparameter tuning)")
                     
                     best_model = base_models[model_name]
@@ -229,8 +227,8 @@ def run_classification_pipeline(X, y, config, output_dir):
                     model = best_model
                     y_pred = model.predict(X_test_sel)
                     
-                    logger.info(f"    {model_name} best score (inner CV): {best_score:.3f}")
-                    logger.info(f"    {model_name} best parameters: {best_params}")
+                    logger.info(f"{model_name} best score (inner CV): {best_score:.3f}")
+                    logger.info(f"{model_name} best parameters: {best_params}")
                     
                 elif model_name in config.MODELS_WITHOUT_HYPERPARAMETERS:
                     logger.info(f"Training {model_name} (no hyperparameter tuning needed)")
@@ -270,24 +268,24 @@ def run_classification_pipeline(X, y, config, output_dir):
                 training_time = time.time() - start_time
                 
                 logger.info(f"Outer test metrics:")
-                logger.info(f"  Accuracy = {accuracy:.3f}")
-                logger.info(f"  F1 = {f1:.3f}")
-                logger.info(f"  Precision = {precision:.3f}")
-                logger.info(f"  Recall = {recall:.3f}")
-                logger.info(f"  Training time: {training_time:.2f}s")
+                logger.info(f"Accuracy = {accuracy:.3f}")
+                logger.info(f"F1 = {f1:.3f}")
+                logger.info(f"Precision = {precision:.3f}")
+                logger.info(f"Recall = {recall:.3f}")
+                logger.info(f"Training time: {training_time:.2f}s")
                 
                 inner_score = best_score
                 
                 overfitting_ratio = inner_score - accuracy
                 logger.info(f"Overfitting analysis:")
-                logger.info(f"  Inner CV score: {inner_score:.3f}")
-                logger.info(f"  Outer test score: {accuracy:.3f}")
-                logger.info(f"  Performance drop: {overfitting_ratio:.3f}")
+                logger.info(f"Inner CV score: {inner_score:.3f}")
+                logger.info(f"Outer test score: {accuracy:.3f}")
+                logger.info(f"Performance drop: {overfitting_ratio:.3f}")
                 
                 if overfitting_ratio > 0.1:
-                    logger.warning(f"  Significant overfitting detected!")
+                    logger.warning(f"Significant overfitting detected!")
                 elif overfitting_ratio > 0.05:
-                    logger.warning(f"  Moderate overfitting detected")
+                    logger.warning(f"Moderate overfitting detected")
                 else:
                     logger.info(f"  Good generalization")
                 
@@ -322,7 +320,7 @@ def run_classification_pipeline(X, y, config, output_dir):
                     f"{model_name}_fold_{fold}", task_type="classification"
                 )
                 
-                logger.info(f"    {model_name} completed successfully")
+                logger.info(f"{model_name} completed successfully")
                 
                 if hasattr(model, 'coef_'):
                     non_zero_coefs = np.sum(model.coef_ != 0)
@@ -436,7 +434,7 @@ def run_classification_pipeline(X, y, config, output_dir):
         ensemble_models = {}
         
         if "hybrid" in config.ENSEMBLE_METHODS:
-            # For hybrid ensemble, select top traditional models and best ICL model
+            #select top traditional models and best ICL model
             if len(base_models) >= 2:
                 # Get top traditional models
                 traditional_models = {name: base_models[name] for name in top_models 
@@ -600,9 +598,9 @@ def run_classification_pipeline(X, y, config, output_dir):
                     plot_performance_vs_time_tradeoff(final_results_df, os.path.join(output_dir, "analysis"), task_type="classification")
                     plot_ensemble_advantage_analysis(individual_models, ensemble_models, os.path.join(output_dir, "analysis"), task_type="classification")
                     
-                    logger.info("Comprehensive ensemble comparison plots created!")
+                    logger.info("ensemble comparison plots created!")
                 except Exception as e:
-                    logger.warning(f"Could not create comprehensive ensemble comparison plots: {e}")
+                    logger.warning(f"Could not do ensemble comparison plots: {e}")
 
     
     results_df = pd.DataFrame()
@@ -849,7 +847,7 @@ def create_comprehensive_analysis_plots(results, output_dir):
             plot_ensemble_analysis(results_df, ensemble_dict, analysis_dir, task_type="classification")
             plot_ensemble_details(ensemble_dict, analysis_dir, task_type="classification")
         
-        logger.info("Comprehensive analysis plots created successfully!")
+        logger.info("Comprehensive analysis plots Done")
 
 def main():
     start_time = time.time()
@@ -911,7 +909,7 @@ def main():
         
         results_df = run_classification_pipeline(X, y, config, output_dir)
         
-        logger.info("NESTED CROSS-VALIDATION PIPELINE COMPLETED SUCCESSFULLY!")
+        logger.info("NESTED CROSS-VALIDATION PIPELINE DONE")
         
         logger.info("")
         logger.info("="*60)
@@ -921,7 +919,7 @@ def main():
         logger.info(f"Feature quality analysis: {os.path.join(output_dir, 'analysis', 'feature_quality_analysis.png')}")
         logger.info(f"Organ PCA analysis: {os.path.join(output_dir, 'analysis', 'organ_pca_analysis.png')}")
         logger.info(f"Model comparison plots: {os.path.join(output_dir, 'analysis', 'model_comparison_accuracy.png')}")
-        logger.info(f"Comprehensive model comparison: {os.path.join(output_dir, 'analysis', 'comprehensive_model_comparison.png')}")
+        logger.info(f"Model comparison: {os.path.join(output_dir, 'analysis', 'comprehensive_model_comparison.png')}")
         logger.info(f"Model performance radar: {os.path.join(output_dir, 'analysis', 'model_performance_radar.png')}")
         logger.info(f"Statistical significance matrix: {os.path.join(output_dir, 'analysis', 'statistical_significance_matrix.png')}")
         logger.info(f"CV stability analysis: {os.path.join(output_dir, 'analysis', 'cv_stability_analysis.png')}")

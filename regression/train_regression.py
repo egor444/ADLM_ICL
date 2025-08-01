@@ -88,59 +88,58 @@ def run_regression_pipeline(X, y, config, output_dir):
         
         logger.info(f"Train samples: {len(train_idx)}, Test samples: {len(test_idx)}")
         
-        logger.info(f"  Data Distribution Analysis:")
-        logger.info(f"    Train target - Mean: {y_train_outer.mean():.2f}, Std: {y_train_outer.std():.2f}, Range: [{y_train_outer.min():.2f}, {y_train_outer.max():.2f}]")
-        logger.info(f"    Test target - Mean: {y_test_outer.mean():.2f}, Std: {y_test_outer.std():.2f}, Range: [{y_test_outer.min():.2f}, {y_test_outer.max():.2f}]")
+        logger.info(f"Data Distribution Analysis:")
+        logger.info(f"Train target - Mean: {y_train_outer.mean():.2f}, Std: {y_train_outer.std():.2f}, Range: [{y_train_outer.min():.2f}, {y_train_outer.max():.2f}]")
+        logger.info(f" Test target - Mean: {y_test_outer.mean():.2f}, Std: {y_test_outer.std():.2f}, Range: [{y_test_outer.min():.2f}, {y_test_outer.max():.2f}]")
         
         train_feature_means = X_train_outer.mean()
         test_feature_means = X_test_outer.mean()
         feature_diff = np.abs(train_feature_means - test_feature_means)
-        logger.info(f"    Feature distribution difference - Mean: {feature_diff.mean():.4f}, Max: {feature_diff.max():.4f}")
+        logger.info(f"Feature distribution difference - Mean: {feature_diff.mean():.4f}, Max: {feature_diff.max():.4f}")
         
         if feature_diff.max() > 1.0:
-            logger.warning(f"    Large feature distribution differences detected - potential data leakage risk")
+            logger.warning(f"Large feature distribution differences detected, potential data leakage risk")
         else:
-            logger.info(f"    Feature distributions are similar between train and test sets")
+            logger.info(f"Feature distributions are similar between train and test sets")
         
-        logger.info("  Starting feature engineering...")
-        logger.info(f"    Input features: {X_train_outer.shape[1]}")
-        logger.info(f"    Training samples: {X_train_outer.shape[0]}")
-        logger.info(f"    Test samples: {X_test_outer.shape[0]}")
-        logger.info(f"    No data leakage: Feature engineering fitted only on training data")
+        logger.info("Starting feature engineering")
+        logger.info(f"Input features: {X_train_outer.shape[1]}")
+        logger.info(f"Training samples: {X_train_outer.shape[0]}")
+        logger.info(f"Test samples: {X_test_outer.shape[0]}")
         
         fe = FeatureEngineering(**config.FEATURE_ENGINEERING_PARAMS)
         X_train_eng = fe.fit_transform(X_train_outer, y_train_outer)
         X_test_eng = fe.transform(X_test_outer)
-        logger.info(f"  Feature engineering complete: {X_train_eng.shape[1]} features")
+        logger.info(f"Feature engineering complete: {X_train_eng.shape[1]} features")
         
-        logger.info(f"  Starting organ PCA feature selection: {X_train_eng.shape[1]} features")
-        logger.info(f"    Components per organ: {config.ORGAN_PCA_SETTINGS['n_components_per_organ']}")
+        logger.info(f"Starting organ PCA feature selection: {X_train_eng.shape[1]} features")
+        logger.info(f"Components per organ: {config.ORGAN_PCA_SETTINGS['n_components_per_organ']}")
         
         from feature_engineering.organ_pca_selector import OrganPCASelector
         organ_pca_selector = OrganPCASelector(**config.ORGAN_PCA_SETTINGS)
-        logger.info(f"    No data leakage: Organ PCA fitted only on training data")
+        logger.info(f"No data leakage: Organ PCA fitted only on training data")
         X_train_sel = organ_pca_selector.fit_transform(X_train_eng, y_train_outer)
         X_test_sel = organ_pca_selector.transform(X_test_eng)
-        logger.info(f"  Organ PCA complete: {X_train_sel.shape[1]} PCA components selected")
-        logger.info(f"    Final training shape: {X_train_sel.shape}")
-        logger.info(f"    Final test shape: {X_test_sel.shape}")
+        logger.info(f"Organ PCA complete: {X_train_sel.shape[1]} PCA components selected")
+        logger.info(f"Final training shape: {X_train_sel.shape}")
+        logger.info(f"Final test shape: {X_test_sel.shape}")
         
-        logger.info(f"    Organ PCA analysis:")
-        logger.info(f"      Original features: {X_train_eng.shape[1]}")
-        logger.info(f"      PCA components: {X_train_sel.shape[1]}")
-        logger.info(f"      Organs found: {len(organ_pca_selector.organ_groups)}")
+        logger.info(f"Organ PCA analysis:")
+        logger.info(f"Original features: {X_train_eng.shape[1]}")
+        logger.info(f"PCA components: {X_train_sel.shape[1]}")
+        logger.info(f"Organs found: {len(organ_pca_selector.organ_groups)}")
         
         organ_summary = organ_pca_selector.get_organ_summary()
         if isinstance(organ_summary, dict):
             for organ, info in organ_summary.items():
-                logger.info(f"      {organ}: {info['n_original_features']} features -> {info['n_components']} PCA components")
+                logger.info(f"{organ}: {info['n_original_features']} features -> {info['n_components']} PCA components")
         
         if X_train_sel.shape[1] < 50:
-            logger.warning(f"      Very few PCA components - may cause underfitting")
+            logger.warning(f"Very few PCA components, may cause underfitting")
         elif X_train_sel.shape[1] > 1000:
-            logger.warning(f"      Many PCA components - may cause overfitting")
+            logger.warning(f"Many PCA components, may cause overfitting")
         else:
-            logger.info(f"      Reasonable number of PCA components")
+            logger.info(f"Reasonable number of PCA components")
         
         inner_cv = KFold(n_splits=config.INNER_CV_FOLDS, shuffle=True, random_state=config.RANDOM_STATE)
         
@@ -149,7 +148,7 @@ def run_regression_pipeline(X, y, config, output_dir):
         plot_organ_pca_analysis(organ_pca_selector, f"{output_dir}/analysis")
         
         feature_indices = list(range(X_train_sel.shape[1]))
-        logger.info(f"    Setting feature indices for ICL models: {len(feature_indices)} PCA components")
+        logger.info(f"Setting feature indices for ICL models: {len(feature_indices)} PCA components")
         
         for model_name in ['TabPFNICL', 'GPT2ICL']:
             if model_name in base_models:
@@ -157,10 +156,10 @@ def run_regression_pipeline(X, y, config, output_dir):
                     base_models[model_name].set_feature_indices(feature_indices)
         
         for model_name, base_model in base_models.items():
-            logger.info(f"  Training {model_name} with nested CV")
-            logger.info(f"    Outer fold: {fold}/{config.CV_FOLDS}")
-            logger.info(f"    Training data shape: {X_train_sel.shape}")
-            logger.info(f"    Test data shape: {X_test_sel.shape}")
+            logger.info(f"Training {model_name} with nested CV")
+            logger.info(f"Outer fold: {fold}/{config.CV_FOLDS}")
+            logger.info(f"Training data shape: {X_train_sel.shape}")
+            logger.info(f"Test data shape: {X_test_sel.shape}")
             start_time = time.time()
             
             try:
@@ -358,9 +357,9 @@ def run_regression_pipeline(X, y, config, output_dir):
         if best_model:
             logger.info(f"Best model: {best_model} (R² = {best_score:.3f})")
             if best_score < 0.3:
-                logger.warning(f"All models performing poorly - consider feature engineering or data quality")
+                logger.warning(f"All models performing bad")
             elif best_score < 0.5:
-                logger.warning(f"Poor performance - may need more features or different models")
+                logger.warning(f"bad performance")
             else:
                 logger.info(f"Reasonable performance achieved")
         
@@ -413,14 +412,14 @@ def run_regression_pipeline(X, y, config, output_dir):
                 traditional_models = {name: base_models[name] for name in top_models 
                                    if not name.endswith('ICL')}
                 
-                # Get best ICL model based on performance
+                #Get best ICL model based on performance
                 icl_results = temp_results_df[temp_results_df['Model'].str.endswith('ICL')]
                 best_icl_model = None
                 if len(icl_results) > 0:
                     best_icl_model = icl_results.loc[icl_results['Mean_R2'].idxmax(), 'Model']
                     logger.info(f"Best ICL model: {best_icl_model} (R² = {icl_results['Mean_R2'].max():.3f})")
                 
-                # Create hybrid models dict with top traditional + best ICL
+                #Creating hybrid models dict with top traditional + best ICL
                 hybrid_models = traditional_models.copy()
                 if best_icl_model and best_icl_model in base_models:
                     hybrid_models[best_icl_model] = base_models[best_icl_model]
@@ -429,21 +428,21 @@ def run_regression_pipeline(X, y, config, output_dir):
                     logger.info(f"Hybrid ensemble: {list(traditional_models.keys())} (no ICL models available)")
                 
                 hybrid_ensemble = create_hybrid_ensemble(
-                    hybrid_models,  # Pass selected models
+                    hybrid_models,  #Passing selected models
                     top_n=len(hybrid_models),
                     cv_folds=config.INNER_CV_FOLDS,
                     random_state=config.RANDOM_STATE
                 )
                 ensemble_models['HybridEnsemble'] = hybrid_ensemble
-                logger.info("Created hybrid ensemble with top traditional + best ICL model")
+                logger.info("Created hybrid ensemble with top N traditional + best ICL model")
             else:
                 logger.warning("Need at least 2 models for hybrid ensemble")
         
         if ensemble_models:
-            logger.info("Evaluating ensemble models with nested CV...")
+            logger.info("Evaluating ensemble models with nested CV")
             
             for ensemble_name, ensemble_model in ensemble_models.items():
-                logger.info(f"  Evaluating {ensemble_name}")
+                logger.info(f"Evaluating {ensemble_name}")
                 
                 ensemble_results = {
                     'r2_scores': [],
@@ -499,7 +498,7 @@ def run_regression_pipeline(X, y, config, output_dir):
                 logger.info(f"Time = {mean_time:.2f}s")
                 logger.info("")
         
-        logger.info("Ensemble evaluation complete!")
+        logger.info("Ensemble evaluation Done")
         logger.info("")
         
         try:
@@ -598,10 +597,10 @@ def run_regression_pipeline(X, y, config, output_dir):
             else:
                 final_model = base_models[best_model_name]
         elif best_model_name.endswith('Ensemble'):
-            # Handle ensemble models that are not in base_models
+            #Handle ensemble models that are not in base_models
             logger.info(f"Recreating {best_model_name} for final training...")
             if best_model_name == "HybridEnsemble":
-                # Get top models for hybrid ensemble
+                #Get top models for hybrid ensemble
                 temp_results_data = []
                 for model_name, result in results.items():
                     if len(result['r2_scores']) > 0 and not model_name.endswith('Ensemble'):
@@ -613,18 +612,18 @@ def run_regression_pipeline(X, y, config, output_dir):
                     temp_results_df = temp_results_df.sort_values('Mean_R2', ascending=False)
                     top_models = temp_results_df.head(config.TOP_MODELS_FOR_ENSEMBLE)['Model'].tolist()
                     
-                    # Get top traditional models
+                    #Get top traditional ml models
                     traditional_models = {name: base_models[name] for name in top_models 
                                        if not name.endswith('ICL')}
                     
-                    # Get best ICL model based on performance
+                    #Get best ICL model based on performance
                     icl_results = temp_results_df[temp_results_df['Model'].str.endswith('ICL')]
                     best_icl_model = None
                     if len(icl_results) > 0:
                         best_icl_model = icl_results.loc[icl_results['Mean_R2'].idxmax(), 'Model']
                         logger.info(f"Best ICL model for final training: {best_icl_model} (R² = {icl_results['Mean_R2'].max():.3f})")
                     
-                    # Create hybrid models dict with top traditional + best ICL
+                    #Creating hybrid models dict with top traditional + best ICL
                     hybrid_models = traditional_models.copy()
                     if best_icl_model and best_icl_model in base_models:
                         hybrid_models[best_icl_model] = base_models[best_icl_model]
@@ -634,7 +633,7 @@ def run_regression_pipeline(X, y, config, output_dir):
                     
                     if len(hybrid_models) >= 2:
                         final_model = create_hybrid_ensemble(
-                            hybrid_models,  # Pass selected models
+                            hybrid_models,  #Passing selected models
                             top_n=len(hybrid_models),
                             cv_folds=config.INNER_CV_FOLDS,
                             random_state=config.RANDOM_STATE
@@ -647,7 +646,7 @@ def run_regression_pipeline(X, y, config, output_dir):
                     logger.warning(f"No valid models found for {best_model_name}, using first available model")
                     final_model = list(base_models.values())[0]
             else:
-                # For other ensemble types, use the best individual model
+              
                 logger.warning(f"Unknown ensemble type {best_model_name}, using best individual model")
                 best_individual = None
                 best_score = -np.inf
@@ -741,7 +740,7 @@ def create_comprehensive_analysis_plots(results, output_dir):
         results_df = pd.DataFrame(results_data)
         results_df = results_df.sort_values('Mean_R2', ascending=False)
         
-        logger.info("Creating model comparison plots...")
+        logger.info("Creating model comparison plots")
         plot_model_comparison(results_df, 'R2', analysis_dir, task_type="regression")
         plot_comprehensive_model_comparison(results_df, analysis_dir, task_type="regression")
         plot_model_performance_radar(results_df, analysis_dir, task_type="regression")
@@ -751,19 +750,19 @@ def create_comprehensive_analysis_plots(results, output_dir):
         plot_cv_stability_analysis(results, analysis_dir, task_type="regression")
         plot_fold_performance_comparison(results, analysis_dir, task_type="regression")
         
-        logger.info("Creating model category analysis...")
+        logger.info("Creating model category analysis")
         plot_model_category_analysis(results_df, analysis_dir, task_type="regression")
         
         icl_models = results_df[results_df['Model'].str.contains('GPT2|TabPFN')]
         if len(icl_models) > 0:
-            logger.info("Creating ICL benchmark analysis...")
+            logger.info("Creating ICL benchmark analysis")
             plot_icl_benchmark_analysis(results_df, analysis_dir, task_type="regression")
             plot_icl_detailed_comparison(results_df, analysis_dir, task_type="regression")
             plot_icl_advantage_analysis(results_df, analysis_dir, task_type="regression")
         
         ensemble_models = results_df[results_df['Model'].str.contains('Ensemble')]
         if len(ensemble_models) > 0:
-            logger.info("Creating ensemble analysis...")
+            logger.info("Creating ensemble analysis")
             ensemble_dict = {}
             for _, row in ensemble_models.iterrows():
                 ensemble_dict[row['Model']] = {
@@ -794,7 +793,7 @@ def main():
         X = train_data.drop(columns=[TARGET_COL])
         y = train_data[TARGET_COL]
         
-        logger.info("Validating and cleaning data...")
+        logger.info("Validating and cleaning data")
         
         if np.any(np.isinf(X.values)):
             logger.warning("Infinite values detected, replacing with NaN")
@@ -810,7 +809,7 @@ def main():
             X = X[valid_mask]
             y = y[valid_mask]
         
-        logger.info("Performing additional outlier detection...")
+        logger.info("Performing additional outlier detection")
         for col in X.columns:
             Q1 = X[col].quantile(0.25)
             Q3 = X[col].quantile(0.75)
@@ -819,7 +818,7 @@ def main():
             upper_bound = Q3 + 3 * IQR
             X[col] = X[col].clip(lower_bound, upper_bound)
         
-        logger.info("Data validation and cleaning complete")
+        logger.info("Data validation and cleaning done")
         
         logger.info(f"Dataset: {X.shape[0]} samples, {X.shape[1]} features")
         logger.info(f"Target range: {y.min():.2f} to {y.max():.2f}")
@@ -827,15 +826,15 @@ def main():
         analysis_dir = os.path.join(output_dir, "analysis")
         os.makedirs(analysis_dir, exist_ok=True)
         
-        logger.info("Creating target distribution analysis...")
+        logger.info("Creating target distribution analysis")
         plot_target_distribution(y, analysis_dir, task_type="regression")
         
-        logger.info("Creating feature quality analysis...")
+        logger.info("Creating feature quality analysis")
         plot_feature_quality_analysis(X, y, analysis_dir, task_type="regression")
         
         results_df = run_regression_pipeline(X, y, config, output_dir)
         
-        logger.info("NESTED CROSS-VALIDATION PIPELINE COMPLETED SUCCESSFULLY!")
+        logger.info("NESTED CROSS-VALIDATION PIPELINE DONE")
         
         logger.info("")
         logger.info("="*60)

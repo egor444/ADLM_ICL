@@ -252,7 +252,6 @@ class GPT2ICLRegressorWrapper(BaseEstimator, RegressorMixin):
         }
     
     def set_params(self, **params):
-        #Set parameters for this estimator
         for key, value in params.items():
             if hasattr(self, key):
                 setattr(self, key, value)

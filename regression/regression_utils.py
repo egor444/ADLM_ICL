@@ -54,9 +54,8 @@ def log_timing_info(start_time, operation_name, logger=None):
         print(message)
 
 
-
+#Display results table with all variance information
 def display_results_table(results_df, logger):
-    """Display results table with all variance information"""
     logger.info("="*80)
     logger.info("COMPLETE RESULTS TABLE WITH VARIANCE")
     logger.info("="*80)
@@ -83,12 +82,12 @@ def display_results_table(results_df, logger):
         logger.info(f"{model_name:<20} {r2_str:<12} {mae_str:<12} {mse_str:<12} {time_str:<8}")
     
     logger.info("-" * 80)
-    logger.info("Note: All metrics include mean ± standard deviation from nested CV")
+    logger.info("All metrics include mean ± standard deviation from nested CV")
     logger.info("="*80)
     logger.info("")
 
 def save_results(results, output_dir, config):
-    """Save results to CSV with proper nested CV statistics"""
+    #Save results to CSV with nested CV statistics
     logger = logging.getLogger(__name__)
     results_data = []
     
@@ -151,11 +150,11 @@ def save_results(results, output_dir, config):
         
         for i, row in results_df.head(5).iterrows():
             logger.info(f"{i+1}. {row['Model']}:")
-            logger.info(f"   R² = {row['Mean_R2']:.3f} ± {row['Std_R2']:.3f}")
-            logger.info(f"   MAE = {row['Mean_MAE']:.3f} ± {row['Std_MAE']:.3f}")
-            logger.info(f"   MSE = {row['Mean_MSE']:.3f} ± {row['Std_MSE']:.3f}")
-            logger.info(f"   Inner CV = {row['Mean_Inner_CV']:.3f}")
-            logger.info(f"   Avg Time = {row['Mean_Time']:.2f}s")
+            logger.info(f"R² = {row['Mean_R2']:.3f} ± {row['Std_R2']:.3f}")
+            logger.info(f"MAE = {row['Mean_MAE']:.3f} ± {row['Std_MAE']:.3f}")
+            logger.info(f"MSE = {row['Mean_MSE']:.3f} ± {row['Std_MSE']:.3f}")
+            logger.info(f"Inner CV = {row['Mean_Inner_CV']:.3f}")
+            logger.info(f"Avg Time = {row['Mean_Time']:.2f}s")
             logger.info("")
         
         # Save detailed hyperparameter results

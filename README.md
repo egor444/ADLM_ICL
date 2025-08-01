@@ -46,6 +46,13 @@ pip install -r requirements
     ```
 6. Any output files wil now be in the **outfile** directory.
 
+6. Any output files will now be in the **outfile** directory.
+
 ## Further Experiments
 
-More files for running TabPFN with context window size experiments or GPT-2 experiments are in the subdirectories *tabpf* or *gpt2* in the respective **regression** or **classification** directories.
+Additional scripts for conducting experiments for TabPFN with context window sizes and GPT-2 models are available:
+
+- **TabPFN context window size experiments**: See the `tabpfn/` subdirectory within the `regression/` or `classification/` folders.
+- **GPT-2 experiments**: Also located in the `gpt2/` subdirectories under the `regression/` or `classification/` folders.
+
+These directories contain code and configurations for extended experimentation.

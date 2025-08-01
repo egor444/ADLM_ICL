@@ -1,3 +1,5 @@
 # Outfiles
 
-Here any file outputs and logs for calssififcation and regression runs will be stored.
+Here any file outputs and logs for classification and regression runs will be stored.
+.out files are just indications of weather a job is running.
+.log files contain all the information from the current run. 

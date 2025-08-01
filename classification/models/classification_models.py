@@ -54,7 +54,7 @@ class GPT2ICLClassifierWrapper(BaseEstimator, ClassifierMixin):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.label_texts = ["negative", "positive"]
         
-        # Add error handling for GPT2 model initialization
+        
         try:
             self.model = GPT2ICLLabelDecoder(label_texts=self.label_texts, device=self.device)
             self.model_available = True
@@ -73,6 +73,8 @@ class GPT2ICLClassifierWrapper(BaseEstimator, ClassifierMixin):
     def fit(self, X, y):
         self.X_train = X.values if hasattr(X, "values") else np.array(X)
         self.y_train = y.values if hasattr(y, "values") else np.array(y)
+        # Set classes_ attribute required by scikit-learn
+        self.classes_ = np.unique(y)
         return self
         
     def predict(self, X):
@@ -144,6 +146,8 @@ class TabPFNClassifierWrapper(BaseEstimator, ClassifierMixin):
     def fit(self, X, y):
         self.X_train = X.values if hasattr(X, "values") else np.array(X)
         self.y_train = y.values if hasattr(y, "values") else np.array(y)
+        # Set classes_ attribute required by scikit-learn
+        self.classes_ = np.unique(y)
         return self
         
     def _predict_one(self, x_query, idx):

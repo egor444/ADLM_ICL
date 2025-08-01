@@ -154,10 +154,10 @@ def log_imbalance_summary(y, task='classification', logger=None):
     if task == 'classification':
         imbalance_info = detect_class_imbalance(y)
         logger.info(f"Class imbalance analysis:")
-        logger.info(f"  - Imbalance ratio: {imbalance_info['imbalance_ratio']:.2f}")
-        logger.info(f"  - Severity: {imbalance_info['severity']}")
-        logger.info(f"  - Minority class: {imbalance_info['minority_class']}")
-        logger.info(f"  - Class distribution: {imbalance_info['class_distribution']}")
+        logger.info(f"Imbalance ratio: {imbalance_info['imbalance_ratio']:.2f}")
+        logger.info(f"Severity: {imbalance_info['severity']}")
+        logger.info(f"Minority class: {imbalance_info['minority_class']}")
+        logger.info(f"Class distribution: {imbalance_info['class_distribution']}")
         
         if imbalance_info['is_imbalanced']:
             logger.warning(f"Class imbalance detected! Ratio: {imbalance_info['imbalance_ratio']:.2f}")
@@ -167,9 +167,9 @@ def log_imbalance_summary(y, task='classification', logger=None):
     else:
         imbalance_info = detect_regression_imbalance(y)
         logger.info(f"Regression imbalance analysis:")
-        logger.info(f"  - Kurtosis: {imbalance_info.get('kurtosis', 'N/A'):.2f}")
-        logger.info(f"  - Skewness: {imbalance_info.get('skewness', 'N/A'):.2f}")
-        logger.info(f"  - Severity: {imbalance_info['severity']}")
+        logger.info(f"Kurtosis: {imbalance_info.get('kurtosis', 'N/A'):.2f}")
+        logger.info(f"Skewness: {imbalance_info.get('skewness', 'N/A'):.2f}")
+        logger.info(f"Severity: {imbalance_info['severity']}")
         
         if imbalance_info['is_imbalanced']:
             logger.warning(f"Distribution imbalance detected! Kurtosis: {imbalance_info.get('kurtosis', 'N/A'):.2f}")

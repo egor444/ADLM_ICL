@@ -78,7 +78,6 @@ class TabPFNICLWrapper(BaseEstimator, RegressorMixin):
         self.logger = logging.getLogger(__name__)
     
     def get_params(self, deep=True):
-        """Get parameters for this estimator."""
         return {
             'device': self.device,
             'random_state': self.random_state,
@@ -91,7 +90,6 @@ class TabPFNICLWrapper(BaseEstimator, RegressorMixin):
         }
     
     def set_params(self, **params):
-        """Set parameters for this estimator."""
         for key, value in params.items():
             if hasattr(self, key):
                 setattr(self, key, value)

@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=classification
-#SBATCH --output=outfiles3/classification.out
-#SBATCH --error=outfiles3/classification.err
+#SBATCH --job-name=gpt2_classification
+#SBATCH --output=outfiles/gpt2_classification.out
+#SBATCH --error=outfiles/gpt2_classification.err
 ##SBATCH --partition=universe,asteroids
 ##SBATCH --qos=master-queuesave
 #SBATCH --time=08:00:00

@@ -32,7 +32,6 @@ class FeatureEngineering(BaseEstimator, TransformerMixin):
                  log_level: int = None,
                  **kwargs):
         
-        # Process kwargs first to override defaults
         mapping = {
             'polynomial_features': None,
             'polynomial_degree': None,
@@ -48,7 +47,6 @@ class FeatureEngineering(BaseEstimator, TransformerMixin):
             'outlier_threshold': None,
         }
         
-        # Process kwargs before setting defaults
         for k, v in list(kwargs.items()):
             if k in mapping and mapping[k]:
                 setattr(self, mapping[k], v)
@@ -64,7 +62,6 @@ class FeatureEngineering(BaseEstimator, TransformerMixin):
         if unused:
             warnings.warn(f"FeatureEngineering: Ignored config keys: {unused}")
         
-        # Now set defaults (kwargs already processed)
         self.impute_strategy_numeric = impute_strategy_numeric
         self.impute_strategy_categorical = impute_strategy_categorical
         self.scale_method = scale_method
@@ -82,7 +79,7 @@ class FeatureEngineering(BaseEstimator, TransformerMixin):
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
 
-        # Initialize transformation_summary
+        #Initialize transformation_summary
         self.transformation_summary = {}
 
     def _log(self, *args, level=logging.INFO):
@@ -218,7 +215,7 @@ class FeatureEngineering(BaseEstimator, TransformerMixin):
             X_transformed = pd.concat([X_transformed, cat_encoded], axis=1)
             self.logger.info(f"Categorical processing took {time.time() - cat_start:.2f}s")
 
-        # No feature engineering - only preprocessing
+        #No feature engineering - only preprocessing
         self._log(f"Final transformed shape: {X_transformed.shape}")
 
         total_time = time.time() - start_time

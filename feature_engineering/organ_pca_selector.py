@@ -20,7 +20,7 @@ class OrganPCASelector(BaseEstimator, TransformerMixin):
         self.random_state = random_state
         self.verbose = verbose
 
-        #  organ mapping based on csv
+        #organ mapping based on csv
         if organ_indicators is None:
             self.organ_indicators = {
                 'spleen': ['spleen'],
@@ -54,22 +54,22 @@ class OrganPCASelector(BaseEstimator, TransformerMixin):
         else:
             self.organ_indicators = organ_indicators
         
-        # Initialize attributes
+        #Initialize attributes
         self.organ_groups = {}
         self.pca_models = {}
         self.scalers = {}
         self.feature_names_ = None
         
-        # Setup logging
+        #Setup logging
         self.logger = logging.getLogger('OrganPCASelector')
-        # Clear any existing handlers to avoid duplicates
+        #Clear any existing handlers to avoid duplicates
         self.logger.handlers.clear()
         handler = logging.StreamHandler()
         formatter = logging.Formatter('[OrganPCASelector] %(message)s')
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.DEBUG if verbose else logging.INFO)
-        # Prevent propagation to avoid duplicate logs
+        #Prevent propagation to avoid duplicate logs
         self.logger.propagate = False
     
     def _log(self, msg):
@@ -81,7 +81,7 @@ class OrganPCASelector(BaseEstimator, TransformerMixin):
         #Extract organ name from feature name using the above mapping
         feat_low = feature_name.lower()
         
-        # If organ_indicators is a dict, use pattern matching
+        #If organ_indicators is a dict, use pattern matching
         if isinstance(self.organ_indicators, dict):
             for organ, patterns in self.organ_indicators.items():
                 if isinstance(patterns, str):
@@ -90,16 +90,16 @@ class OrganPCASelector(BaseEstimator, TransformerMixin):
                     if pattern.lower() in feat_low:
                         return organ
         
-        # If organ_indicators is a list, use simple substring matching
+        #If organ_indicators is a list, use simple substring matching
         elif isinstance(self.organ_indicators, list):
             for organ in self.organ_indicators:
                 if organ.lower() in feat_low:
                     return organ
         
-        # If no organ indicator found, try to extract from underscore pattern
+        #If no organ indicator found, try to extract from underscore pattern
         parts = feature_name.split('_')
         if len(parts) > 1:
-            # Look for organ-like patterns in the first few parts
+            #Look for organ-like patterns in the first few parts
             for part in parts[:3]:  # Check first 3 parts
                 if len(part) > 2 and not part.isdigit():  # Avoid numbers and very short parts
                     return part
@@ -116,7 +116,7 @@ class OrganPCASelector(BaseEstimator, TransformerMixin):
             organ = self._extract_organ_name(feature)
             organ_groups[organ].append(feature)
         
-        # Log organ grouping results
+        #Log organ grouping results
         for organ, features in organ_groups.items():
             self._log(f"Organ '{organ}': {len(features)} features")
         
@@ -128,23 +128,23 @@ class OrganPCASelector(BaseEstimator, TransformerMixin):
         self._log(f"Fitting Organ PCA Selector with {self.n_components_per_organ} components per organ")
         self._log(f"Input shape: {X.shape}")
         
-        # Group features by organ
+        #Group features by organ
         self.organ_groups = self._group_features_by_organ(X.columns)
         
-        # Apply PCA to each organ group
+        #Apply PCA to each organ group
         pca_results = {}
         self.pca_models = {}
         self.scalers = {}
         
         for organ, features in self.organ_groups.items():
-            # Get features that exist in the input data
+            #Get features that exist in the input data
             available_features = [f for f in features if f in X.columns]
             
             if len(available_features) == 0:
                 self._log(f"Skipping organ '{organ}' - no features available")
                 continue
             
-            # Determine number of components for this organ
+            #Determine number of components for this organ
             if len(available_features) < self.n_components_per_organ:
                 self._log(f"Warning: Organ '{organ}' has only {len(available_features)} features, "
                          f"but {self.n_components_per_organ} components requested. "
@@ -153,38 +153,38 @@ class OrganPCASelector(BaseEstimator, TransformerMixin):
             else:
                 n_components = self.n_components_per_organ
             
-            # Extract organ features
+            #Extract organ features
             X_organ = X[available_features]
             
-            # Scale the features
+            #Scale the features
             scaler = StandardScaler()
             X_organ_scaled = scaler.fit_transform(X_organ)
             self.scalers[organ] = scaler
             
-            # Apply PCA
+            #Apply PCA
             pca = PCA(n_components=n_components, random_state=self.random_state)
             X_pca = pca.fit_transform(X_organ_scaled)
             
-            # Store PCA model
+            #Store PCA model
             self.pca_models[organ] = pca
             
-            # Create column names for PCA components
+            #Create column names for PCA components
             pca_columns = [f"{organ}_pca_{i+1}" for i in range(n_components)]
             
-            # Store results
+            #Store results
             pca_results[organ] = pd.DataFrame(X_pca, columns=pca_columns, index=X.index)
             
-            # Log explained variance
+            #Log explained variance
             explained_variance = pca.explained_variance_ratio_
             total_variance = explained_variance.sum()
             self._log(f"Organ '{organ}': {len(available_features)} features -> {n_components} components "
                      f"(explained variance: {total_variance:.3f})")
             
-            # Log individual component contributions
+            #Log individual component contributions
             for i, (col, var) in enumerate(zip(pca_columns, explained_variance)):
                 self._log(f"  - {col}: {var:.3f} ({var/total_variance*100:.1f}%)")
         
-        # Combine all PCA results to get feature names
+        #Combine all PCA results to get feature names
         if pca_results:
             combined_pca = pd.concat(pca_results.values(), axis=1)
             self.feature_names_ = combined_pca.columns.tolist()
@@ -197,7 +197,6 @@ class OrganPCASelector(BaseEstimator, TransformerMixin):
     
     def transform(self, X):
         #Transform data using fitted organ PCA models.
-        
         
         if not self.pca_models:
             raise ValueError("Call fit() before transform()")

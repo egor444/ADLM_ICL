@@ -135,10 +135,10 @@ def plot_pred_vs_true(y_true, y_pred, output_dir, model_name="model", task_type=
     plt.figure(figsize=(12, 10))
     
     if task_type == "regression":
-        # Create a more sophisticated scatter plot
+        #Create a more sophisticated scatter plot
         plt.scatter(y_true, y_pred, alpha=0.7, s=50, c='#2E8B57', edgecolors='black', linewidth=0.5)
         
-        # Perfect prediction line
+        #Perfect prediction line
         min_val = min(y_true.min(), y_pred.min())
         max_val = max(y_true.max(), y_pred.max())
         plt.plot([min_val, max_val], [min_val, max_val], 'r--', lw=3, alpha=0.8, label='Perfect Prediction')
@@ -147,7 +147,7 @@ def plot_pred_vs_true(y_true, y_pred, output_dir, model_name="model", task_type=
         plt.ylabel('Predicted Values', fontsize=12, fontweight='bold')
         plt.title(f'{model_name} - Predicted vs True Values', fontsize=14, fontweight='bold', pad=20)
         
-        # Add R² score with better styling
+        #Add R² score with better styling
         r2 = r2_score(y_true, y_pred)
         plt.text(0.05, 0.95, f'R² = {r2:.3f}', transform=plt.gca().transAxes, 
                 bbox=dict(boxstyle="round,pad=0.5", facecolor="#E8F5E8", 
@@ -156,7 +156,7 @@ def plot_pred_vs_true(y_true, y_pred, output_dir, model_name="model", task_type=
         plt.grid(True, alpha=0.3, linestyle='--')
         plt.legend(fontsize=10)
         
-        # Style the plot
+        #Style the plot
         plt.gca().set_facecolor('#f8f9fa')
         plt.gca().spines['top'].set_visible(False)
         plt.gca().spines['right'].set_visible(False)
@@ -164,11 +164,11 @@ def plot_pred_vs_true(y_true, y_pred, output_dir, model_name="model", task_type=
     else:
         cm = confusion_matrix(y_true, y_pred)
         
-        # Use a better colormap
+        #Use a better colormap
         plt.imshow(cm, interpolation='nearest', cmap='Blues', aspect='auto')
         plt.title(f'{model_name} - Confusion Matrix', fontsize=14, fontweight='bold', pad=20)
         
-        # Add colorbar with better styling
+        #Add colorbar with better styling
         cbar = plt.colorbar(fraction=0.046, pad=0.04)
         cbar.ax.tick_params(labelsize=10)
         
@@ -435,15 +435,15 @@ def plot_model_performance_radar(results_df, output_dir, task_type="regression")
                 continue
                 
             if col == 'Mean_Time':
-                # Normalize time (lower is better)
+                #Normalize time (lower is better)
                 max_time = results_df[col].max()
                 values.append(1 - (row[col] / max_time))
             elif col == 'Mean_MAE' or col == 'Mean_MSE':
-                # Lower is better for MAE/MSE
+                #Lower is better for MAE/MSE
                 max_val = results_df[col].max()
                 values.append(1 - (row[col] / max_val))
             else:
-                # Higher is better for R2/Accuracy/F1/Precision
+                #Higher is better for R2/Accuracy/F1/Precision
                 max_val = results_df[col].max()
                 values.append(row[col] / max_val)
         
@@ -456,13 +456,13 @@ def plot_model_performance_radar(results_df, output_dir, task_type="regression")
     ax.set_ylim(0, 1)
     ax.set_title('Model Performance Radar Chart', size=18, fontweight='bold', y=1.15, pad=20)
     
-    # Improve legend
+    #Improve legend
     legend = ax.legend(loc='upper right', bbox_to_anchor=(1.4, 1.0), 
                       fontsize=10, frameon=True, fancybox=True, shadow=True)
     legend.get_frame().set_facecolor('white')
     legend.get_frame().set_alpha(0.9)
     
-    # Add subtle background
+    #Add subtle background
     ax.set_facecolor('#f8f9fa')
     
     plt.tight_layout()
@@ -522,7 +522,7 @@ def plot_feature_quality_analysis(X, y, output_dir, task_type="regression"):
     fig, axes = plt.subplots(2, 3, figsize=(15, 10))
     fig.suptitle('Feature Quality Analysis', fontsize=14)
     
-    # Feature correlations with target
+    #Feature correlations with target
     correlations = []
     feature_names = []
     
@@ -533,7 +533,7 @@ def plot_feature_quality_analysis(X, y, output_dir, task_type="regression"):
                 correlations.append(abs(corr))
                 feature_names.append(col)
     
-    # Top correlations
+    #Top correlations
     top_corr_idx = np.argsort(correlations)[-10:]
     top_correlations = [correlations[i] for i in top_corr_idx]
     top_features = [feature_names[i] for i in top_corr_idx]
@@ -545,7 +545,7 @@ def plot_feature_quality_analysis(X, y, output_dir, task_type="regression"):
     axes[0, 0].set_title('Top 10 Feature Correlations')
     axes[0, 0].grid(True, alpha=0.3)
     
-    # Feature variance
+    #Feature variance
     variances = X.var().sort_values(ascending=False)
     top_var_features = variances.head(10)
     
@@ -556,7 +556,7 @@ def plot_feature_quality_analysis(X, y, output_dir, task_type="regression"):
     axes[0, 1].set_title('Top 10 Feature Variances')
     axes[0, 1].grid(True, alpha=0.3)
     
-    # Missing values
+    #Missing values
     missing_counts = X.isnull().sum()
     missing_pct = (missing_counts / len(X)) * 100
     missing_data = pd.DataFrame({'Feature': missing_counts.index, 'Missing_Pct': missing_pct.values})
@@ -623,9 +623,9 @@ def plot_three_way_ensemble_comparison(comparison_df, output_dir, task_type="cla
         f1 = row['Mean_F1']
         time_val = row['Mean_Time']
         summary_text += f"{model}:\n"
-        summary_text += f"  Accuracy: {acc:.3f}\n"
-        summary_text += f"  F1: {f1:.3f}\n"
-        summary_text += f"  Time: {time_val:.2f}s\n\n"
+        summary_text += f"Accuracy: {acc:.3f}\n"
+        summary_text += f"F1: {f1:.3f}\n"
+        summary_text += f"Time: {time_val:.2f}s\n\n"
     
     axes[1, 2].text(0.1, 0.9, summary_text, transform=axes[1, 2].transAxes, 
                     fontsize=10, verticalalignment='top', fontfamily='monospace')
@@ -756,14 +756,12 @@ def plot_final_summary(results_df, output_dir, metric="r2", task_type="regressio
     return plot_comprehensive_model_comparison(results_df, output_dir, task_type)
 
 def plot_learning_curves_comparison(results_df, output_dir, task_type="regression"):
-    """Create detailed fold-wise performance comparison with multiple metrics"""
+    #Create detailed fold-wise performance comparison with multiple metrics
     
-    # This function will be enhanced to show learning curves
-    # For now, we'll create a comprehensive fold analysis
     pass
 
 def plot_fold_performance_comparison(results, output_dir, task_type="regression"):
-    """Create comprehensive fold-wise performance comparison plots"""
+    #Create comprehensive fold-wise performance comparison plots
     
     # Extract all fold-wise results
     fold_data = []
@@ -790,16 +788,16 @@ def plot_fold_performance_comparison(results, output_dir, task_type="regression"
     
     df = pd.DataFrame(fold_data)
     
-    # Create comprehensive visualization
+    #Create comprehensive visualization
     fig, axes = plt.subplots(2, 2, figsize=(18, 14))
     fig.suptitle('Comprehensive Fold-wise Performance Analysis', fontsize=18, fontweight='bold', y=0.95)
     
-    # Get unique models and metrics
+    #Get unique models and metrics
     models = df['Model'].unique()
     metrics = df['Metric'].unique()
     colors = plt.cm.tab10(np.linspace(0, 1, len(models)))
     
-    # 1. Box plot for each metric
+    #1. Box plot for each metric
     for i, metric in enumerate(metrics):
         row, col = i // 2, i % 2
         ax = axes[row, col]
@@ -811,7 +809,7 @@ def plot_fold_performance_comparison(results, output_dir, task_type="regression"
                        medianprops=dict(color='black', linewidth=2),
                        flierprops=dict(marker='o', markerfacecolor='red', markersize=4))
         
-        # Color the boxes
+        #Color the boxes
         for patch, color in zip(bp['boxes'], colors):
             patch.set_facecolor(color)
             patch.set_alpha(0.7)
@@ -824,7 +822,7 @@ def plot_fold_performance_comparison(results, output_dir, task_type="regression"
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
     
-    # 2. Heatmap of fold performance
+    #2. Heatmap of fold performance
     ax = axes[1, 1]
     pivot_data = df.pivot_table(values='Score', index='Model', columns='Fold', aggfunc='mean')
     
@@ -834,7 +832,7 @@ def plot_fold_performance_comparison(results, output_dir, task_type="regression"
     ax.set_yticks(range(len(pivot_data.index)))
     ax.set_yticklabels(pivot_data.index, fontsize=9)
     
-    # Add text annotations
+    #Add text annotations
     for i in range(len(pivot_data.index)):
         for j in range(len(pivot_data.columns)):
             text = ax.text(j, i, f'{pivot_data.iloc[i, j]:.3f}',
@@ -842,7 +840,7 @@ def plot_fold_performance_comparison(results, output_dir, task_type="regression"
     
     ax.set_title('Fold-wise Performance Heatmap', fontsize=12, fontweight='bold', pad=15)
     
-    # Add colorbar
+    #Add colorbar
     cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     cbar.ax.tick_params(labelsize=9)
     
@@ -850,12 +848,12 @@ def plot_fold_performance_comparison(results, output_dir, task_type="regression"
     plt.savefig(os.path.join(output_dir, 'fold_performance_comparison.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Create detailed summary
+    #Create detailed summary
     summary_stats = df.groupby(['Model', 'Metric'])['Score'].agg(['mean', 'std', 'min', 'max']).round(4)
     summary_stats.columns = ['Mean', 'Std', 'Min', 'Max']
     summary_stats = summary_stats.sort_values(['Metric', 'Mean'], ascending=[True, False])
     
-    # Save detailed summary
+    #Save detailed summary
     summary_stats.to_csv(os.path.join(output_dir, 'detailed_fold_summary.csv'))
     
     return summary_stats
@@ -867,7 +865,7 @@ def plot_model_complexity_analysis(results_df, output_dir, task_type="regression
     pass
 
 def plot_cv_stability_analysis(results, output_dir, task_type="regression"):
-    # Extract fold-wise results
+    #Extract fold-wise results
     fold_data = []
     for model_name, result in results.items():
         if len(result.get('r2_scores' if task_type == "regression" else 'accuracy_scores', [])) > 0:
@@ -892,7 +890,7 @@ def plot_cv_stability_analysis(results, output_dir, task_type="regression"):
     df = pd.DataFrame(fold_data)
     models = df['Model'].unique()
     
-    # Create color mapping with special treatment for ICL models
+    #Create color mapping with special treatment for ICL models
     colors = {
         'cornflowerblue': ['LinearRegression', 'Ridge', 'Lasso', 'ElasticNet'],
         'royalblue': ['RandomForest', 'HistGradientBoosting', 'XGBoost', 'LightGBM'],
@@ -901,7 +899,7 @@ def plot_cv_stability_analysis(results, output_dir, task_type="regression"):
         'black': ['GPT2ICL', 'HybridEnsemble']
     }
     
-    # Assign colors to models
+    #Assign colors to models
     model_colors = {}
     for model in models:
         assigned = False
@@ -919,30 +917,30 @@ def plot_cv_stability_analysis(results, output_dir, task_type="regression"):
     plt.style.use('seaborn-v0_8-white')
     plt.figure(figsize=(8, 6))
     
-    # Plot each model
+    #Plot each model
     for model in models:
         model_data = df[df['Model'] == model]
         x = model_data['Fold'].values
         y = model_data['Score'].values
         color = model_colors[model]
         
-        # Special styling for ICL models
+        #Special styling for ICL models
         if 'GPT2ICL' in model or 'HybridEnsemble' in model:
             plt.plot(x, y, label=model, color=color, linewidth=3, marker='*', markersize=12)
         else:
             plt.plot(x, y, label=model, color=color, linewidth=2, marker='o', markersize=6)
     
-    # Axis limits and labels
+    #Axis limits and labels
     metric = df['Metric'].iloc[0]
     plt.ylim(0, 1.0)
     plt.xlabel('Fold Number')
     plt.ylabel(f'{metric} Performance')
     plt.title(f'Model Performance Across Folds', fontsize=14, fontweight='bold')
     
-    # Legend
+    #Legend
     plt.legend(title='Models', loc='center right', bbox_to_anchor=(1.35, 0.5))
     
-    # Remove top/right spines
+    #Remove top/right spines
     for spine in ['top', 'right']:
         plt.gca().spines[spine].set_visible(False)
     
@@ -950,12 +948,12 @@ def plot_cv_stability_analysis(results, output_dir, task_type="regression"):
     plt.savefig(os.path.join(output_dir, 'cv_stability_analysis.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Create summary statistics table
+    #Create summary statistics table
     summary_stats = df.groupby('Model')['Score'].agg(['mean', 'std', 'min', 'max']).round(4)
     summary_stats.columns = ['Mean', 'Std', 'Min', 'Max']
     summary_stats = summary_stats.sort_values('Mean', ascending=False)
     
-    # Save summary to CSV
+    #Save summary to CSV
     summary_stats.to_csv(os.path.join(output_dir, 'cv_fold_summary.csv'))
     
     return summary_stats
@@ -997,7 +995,7 @@ def plot_ensemble_analysis(results_df, ensemble_models, output_dir, task_type="r
     metric_col = 'Mean_R2' if task_type == "regression" else 'Mean_Accuracy'
     metric_name = 'R² Score' if task_type == "regression" else 'Accuracy Score'
     
-    # Performance comparison
+    #Performance comparison
     ax1 = axes[0, 0]
     all_models = pd.concat([individual_df, ensemble_df])
     colors = ['lightblue' if 'Ensemble' not in model else 'orange' for model in all_models['Model']]
@@ -1018,7 +1016,7 @@ def plot_ensemble_analysis(results_df, ensemble_models, output_dir, task_type="r
         ax1.text(0.5, 0.5, f'{metric_name} data not available', ha='center', va='center', transform=ax1.transAxes)
         ax1.set_title(f'{metric_name} Comparison')
     
-    # Time vs performance trade-off
+    #Time vs performance trade-off
     ax2 = axes[0, 1]
     if 'Mean_Time' in individual_df.columns and metric_col in individual_df.columns:
         ax2.scatter(individual_df['Mean_Time'], individual_df[metric_col], 
@@ -1043,7 +1041,7 @@ def plot_ensemble_analysis(results_df, ensemble_models, output_dir, task_type="r
         ax2.text(0.5, 0.5, 'Time/Performance data not available', ha='center', va='center', transform=ax2.transAxes)
         ax2.set_title('Performance vs Time Trade-off')
     
-    # Ensemble advantage analysis
+    #Ensemble advantage analysis
     ax3 = axes[1, 0]
     if metric_col in individual_df.columns and metric_col in ensemble_df.columns:
         best_individual = individual_df.loc[individual_df[metric_col].idxmax()]
@@ -1063,7 +1061,7 @@ def plot_ensemble_analysis(results_df, ensemble_models, output_dir, task_type="r
         ax3.text(0.5, 0.5, 'Improvement data not available', ha='center', va='center', transform=ax3.transAxes)
         ax3.set_title('Improvement over Best Individual Model')
     
-    # Error analysis
+    #Error analysis
     ax4 = axes[1, 1]
     if task_type == "regression":
         metrics = ['Mean_R2', 'Mean_MAE', 'Mean_MSE']
@@ -1100,7 +1098,7 @@ def plot_ensemble_analysis(results_df, ensemble_models, output_dir, task_type="r
     plt.savefig(os.path.join(output_dir, 'ensemble_analysis.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Summary text file
+    #Summary text file
     summary_path = os.path.join(output_dir, 'ensemble_analysis_summary.txt')
     with open(summary_path, 'w') as f:
         f.write("ENSEMBLE ANALYSIS SUMMARY\n")
@@ -1131,7 +1129,7 @@ def plot_ensemble_details(ensemble_models, output_dir, task_type="regression"):
     fig, axes = plt.subplots(2, 2, figsize=(15, 12))
     fig.suptitle('Ensemble Details Analysis', fontsize=16, fontweight='bold')
     
-    # Performance breakdown
+    #Performance breakdown
     ax1 = axes[0, 0]
     ensemble_names = list(ensemble_models.keys())
     scores = [ensemble_models[name]['score'] for name in ensemble_names]
@@ -1148,7 +1146,7 @@ def plot_ensemble_details(ensemble_models, output_dir, task_type="regression"):
         ax1.text(bar.get_x() + bar.get_width()/2., height + 0.001,
                 f'{val:.3f}', ha='center', va='bottom', fontweight='bold')
     
-    # Training time analysis
+    #Training time analysis
     ax2 = axes[0, 1]
     bars = ax2.bar(ensemble_names, times, color='lightgreen', alpha=0.7)
     ax2.set_title('Ensemble Training Time')
@@ -1161,7 +1159,7 @@ def plot_ensemble_details(ensemble_models, output_dir, task_type="regression"):
         ax2.text(bar.get_x() + bar.get_width()/2., height + 0.1,
                 f'{val:.1f}s', ha='center', va='bottom', fontweight='bold')
     
-    # Performance efficiency
+    #Performance efficiency
     ax3 = axes[1, 0]
     efficiency = [score/time if time > 0 else 0 for score, time in zip(scores, times)]
     
@@ -1176,7 +1174,7 @@ def plot_ensemble_details(ensemble_models, output_dir, task_type="regression"):
         ax3.text(bar.get_x() + bar.get_width()/2., height + 0.0001,
                 f'{val:.4f}', ha='center', va='bottom', fontweight='bold')
     
-    # Ensemble composition
+    #Ensemble composition
     ax4 = axes[1, 1]
     
     composition_info = {}
@@ -1212,7 +1210,7 @@ def plot_ensemble_details(ensemble_models, output_dir, task_type="regression"):
     plt.savefig(os.path.join(output_dir, 'ensemble_details.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Detailed summary
+    #Detailed summary
     details_path = os.path.join(output_dir, 'ensemble_details_summary.txt')
     with open(details_path, 'w') as f:
         f.write("ENSEMBLE DETAILS SUMMARY\n")
@@ -1220,17 +1218,17 @@ def plot_ensemble_details(ensemble_models, output_dir, task_type="regression"):
         
         for name, metrics in ensemble_models.items():
             f.write(f"{name}:\n")
-            f.write(f"  R² Score: {metrics['score']:.3f}\n")
-            f.write(f"  Training Time: {metrics['time']:.2f}s\n")
-            f.write(f"  Efficiency: {metrics['score']/metrics['time']:.4f} R²/s\n")
+            f.write(f"R² Score: {metrics['score']:.3f}\n")
+            f.write(f"Training Time: {metrics['time']:.2f}s\n")
+            f.write(f"Efficiency: {metrics['score']/metrics['time']:.4f} R²/s\n")
             
             if name in composition_info:
                 comp = composition_info[name]
-                f.write(f"  Composition:\n")
-                f.write(f"    Traditional Models: {comp['Traditional Models']}\n")
-                f.write(f"    ICL Models: {comp['ICL Models']}\n")
-                f.write(f"    Meta-learner: {comp['Meta-learner']}\n")
-                f.write(f"    Method: {comp['Method']}\n")
+                f.write(f"Composition:\n")
+                f.write(f"Traditional Models: {comp['Traditional Models']}\n")
+                f.write(f"ICL Models: {comp['ICL Models']}\n")
+                f.write(f"Meta-learner: {comp['Meta-learner']}\n")
+                f.write(f"Method: {comp['Method']}\n")
             f.write("\n")
         
         best_ensemble = max(ensemble_models.items(), key=lambda x: x[1]['score'])

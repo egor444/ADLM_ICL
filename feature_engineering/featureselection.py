@@ -19,7 +19,18 @@ from data_extraction.data_manager import DataManager
 from feature_engineering.sampling import balance_data  # Adjust import if needed
 from sklearn.decomposition import PCA
 warnings.filterwarnings('ignore')
-
+from sklearn.metrics import r2_score
+from sklearn.pipeline import Pipeline
+from feature_engineering.organ_pca_selector import OrganPCASelector
+import logging
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, precision_score, recall_score
+from sklearn.base import clone
+import numpy as np
+import pandas as pd
+from joblib import Parallel, delayed
+import time
+from sklearn.feature_selection import mutual_info_regression
+from sklearn.feature_selection import mutual_info_classif
 #not used not since we are using the organ selector
 class FeatureSelector:
     def __init__(self, config, verbose=True):
@@ -52,7 +63,6 @@ class FeatureSelector:
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
         self.logger.setLevel(logging.DEBUG if verbose else logging.INFO)
-        # Set up config values from dict
         self._log(f'FeatureSelector initialized with config: {self.config}')
         self.task = self._get_config_value('TASK')
         self.random_state = self._get_config_value('RANDOM_STATE')
@@ -61,7 +71,7 @@ class FeatureSelector:
         self.correlation_thresholds = self._get_config_value('CORRELATION_THRESHOLDS')
 
     def _get_config_value(self, key, default=None):
-        # Use dict lookup, then attribute
+      
         if isinstance(self.config, dict) and key in self.config:
             return self.config[key]
         elif hasattr(self.config, key):
@@ -89,7 +99,7 @@ class FeatureSelector:
             feat_low = feat.lower()
             feature_type = None
             
-            # Determine feature type
+            #Determine feature type
             if (feat.replace('.', '').replace('-', '').replace('_', '').isdigit() or
                 (len(feat.split('_')) <= 2 and
                  not any(rad_term in feat_low for rad_term in ['shape', 'glcm', 'glrlm', 'glszm', 'ngtdm', 'gldm', 'firstorder']))):
@@ -108,19 +118,19 @@ class FeatureSelector:
                 parsed_features['tabular'].append(feat)
                 feature_type = 'tabular'
             
-            # Extract organ name more robustly
+            #Extract organ name more robustly
             organ = self._extract_organ_name(feat)
             organ_groups[organ].append(feat)
             
-            # Group by organ and feature type
+            #Group by organ and feature type
             if feature_type:
                 organ_feature_types[organ][feature_type].append(feat)
 
         self.feature_groups = parsed_features
         self.organ_groups = dict(organ_groups)
-        self.organ_feature_types = dict(organ_feature_types)  # New: organ -> feature_type -> features
+        self.organ_feature_types = dict(organ_feature_types)  #organ -> feature_type -> features
 
-        # Store parsing stats
+        #Store parsing stats
         self.filtering_stats['original_features'] = len(feature_names)
         self.filtering_stats['feature_groups'] = {
             group: len(feats) for group, feats in parsed_features.items()
@@ -133,7 +143,7 @@ class FeatureSelector:
             self._log(f"{group}: {len(feats)} features")
         self._log(f"Identified {len(organ_groups)} organs: {list(organ_groups.keys())}")
         
-        # Log organ breakdown
+        #Log organ breakdown
         for organ, feature_types in organ_feature_types.items():
             self._log(f"Organ '{organ}': {sum(len(feats) for feats in feature_types.values())} total features")
             for feat_type, feats in feature_types.items():
@@ -143,7 +153,7 @@ class FeatureSelector:
         return parsed_features
 
     def _extract_organ_name(self, feature_name):
-        # Common organ prefixes to look for
+        #Common organ prefixes to look for
         organ_indicators = [
             'liver', 'kidney', 'spleen', 'pancreas', 'heart', 'lung', 'brain', 
             'stomach', 'intestine', 'bladder', 'prostate', 'uterus', 'ovary',
@@ -152,17 +162,17 @@ class FeatureSelector:
         
         feat_low = feature_name.lower()
         
-        # First, try to find organ indicators in the feature name
+        #First, try to find organ indicators in the feature name
         for organ in organ_indicators:
             if organ in feat_low:
                 return organ
         
-        # If no organ indicator found, try to extract from underscore pattern
+        #If no organ indicator found, try to extract from underscore pattern
         parts = feature_name.split('_')
         if len(parts) > 1:
-            # Look for organ-like patterns in the first few parts
+            #Look for organ-like patterns in the first few parts
             for part in parts[:3]:  # Check first 3 parts
-                if len(part) > 2 and not part.isdigit():  # Avoid numbers and very short parts
+                if len(part) > 2 and not part.isdigit():  #Avoid numbers and very short parts
                     return part
         
         return 'unknown'
@@ -305,7 +315,7 @@ class FeatureSelector:
             if self.task == "regression":
                 scores = f_regression(X, y)
                 importances.append(("univariate", scores[0] if isinstance(scores, tuple) else scores))
-                from sklearn.feature_selection import mutual_info_regression
+                
                 mi = mutual_info_regression(X, y, random_state=self.random_state)
                 importances.append(("mutual_info", mi))
                 lasso_scores = self._compute_lasso_importance(X, y)
@@ -313,7 +323,7 @@ class FeatureSelector:
             else:
                 scores = f_classif(X, y)
                 importances.append(("univariate", scores[0] if isinstance(scores, tuple) else scores))
-                from sklearn.feature_selection import mutual_info_classif
+                
                 mi = mutual_info_classif(X, y, random_state=self.random_state)
                 importances.append(("mutual_info", mi))
                 lasso_scores = self._compute_lasso_importance(X, y)
@@ -700,13 +710,7 @@ class FeatureSelector:
 
 
 def nested_cv_experiment(X, y, config, model_name, n_outer=5, n_inner=3, n_features=None, random_state=42, is_classification=False, splits=None, save_fold_indices_path=None, include_feature_engineering=False, **kwargs):
-    import logging
-    from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, precision_score, recall_score
-    from sklearn.base import clone
-    import numpy as np
-    import pandas as pd
-    from joblib import Parallel, delayed
-    import time
+    
     results = []
     fold_indices = []
     logger = logging.getLogger("nested_cv_experiment")
@@ -758,8 +762,6 @@ def nested_cv_experiment(X, y, config, model_name, n_outer=5, n_inner=3, n_featu
             logger.info(f"Fold {fold}: Starting feature selection...")
             t1 = time.time()
             def make_pipeline():
-                from sklearn.pipeline import Pipeline
-                from feature_engineering.organ_pca_selector import OrganPCASelector
                 steps = []
                 if include_feature_engineering:
                     from feature_engineering.feature_engineering import FeatureEngineering
@@ -893,7 +895,6 @@ def nested_cv_experiment(X, y, config, model_name, n_outer=5, n_inner=3, n_featu
                     fold_result['roc_auc'] = np.nan
                     logger.warning(f"ROC AUC computation failed for fold {fold}: {e}")
             else:
-                from sklearn.metrics import r2_score
                 fold_result['r2'] = r2_score(y_test, y_pred)
                 fold_result['y_true'] = y_test.tolist() if hasattr(y_test, 'tolist') else list(y_test)
                 fold_result['y_pred'] = y_pred.tolist() if hasattr(y_pred, 'tolist') else list(y_pred)

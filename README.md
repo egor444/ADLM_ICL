@@ -36,14 +36,15 @@ For disease risk assesement we performed binary classififcation (not at-risk/at-
 ml python/anaconda3
 pip install -r requirements
 ```
-3. *(Optional)* Change the configuration in the ```regression/config_regression.py``` or ```classification/config_classification.py```
-4. Run the respective .sh file you want e.g. 
-```
-sbatch regression/run_regression.sh
-# OR #
-sbatch classification/run_classification.sh
-```
-5. Any output files wil now be in the **outfile** directory.
+3. Change the output directory ```OUTPUT_DIR``` in the configuration files in ```regression/config_regression.py``` or ```classification/config_classification.py``` to where you want the results to be saved.
+4. **Optional:** Change any other configuration parameters to your liking.
+5. Run the respective .sh file from the project directory you want e.g. 
+    ```
+    sbatch regression/run_regression.sh
+    # OR #
+    sbatch classification/run_classification.sh
+    ```
+6. Any output files wil now be in the **outfile** directory.
 
 ## Further Experiments
 

@@ -31,5 +31,15 @@ For disease risk assesement we performed binary classififcation (not at-risk/at-
 ## How to Use
 
 1. Copy the supplied data folder into the project directory. (Just replace the data folder with the README inside with the data folder, that includes the data)
-2. Navigate in the folder for the task you wish to run, either **regression** or **classification**
+2. Run
+```
+ml python/anaconda3
+pip install -r requirements
+```
+3. Navigate in the folder for the task you wish to run, either **regression** or **classification**
+4. *(Optional)* Change the configuration in the ```config_regression.py``` or ```config_classification.py```
+5. Run the respective .sh file e.g. ```run_regression.sh``` or ```run_classification.sh```
 
+## Further Experiments
+
+More files for running TabPFN with context window size experiments or GPT-2 experiments are in the subdirectories *tabpf* or *gpt2* in the respective **regression** or **classification** directories.
